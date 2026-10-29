@@ -40,7 +40,7 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
 
   // ---------- configurar e ler o documento ----------
   let { pg, ext } = await painelDe("portal", "portal.html");
-  const erros = []; ext.on("pageerror", e => erros.push(e.message)); ext.on("console", m => m.type() === "error" && erros.push(m.text()));
+  const erros = []; ext.on("pageerror", e => erros.push(e.message)); ext.on("console", m => m.type() === "error" && !/ERR_CONNECTION_REFUSED/.test(m.text()) && erros.push(m.text())); // "Yuh Scanner fechado" é normal
   await ext.click("#bConfig");
   await ext.fill("#cPonto", "https://yuh-teste.cognitiveservices.azure.com/"); await ext.fill("#cChave", "a".repeat(32)); await ext.click("#cSalvar");
   await ext.click("#vv");
@@ -150,6 +150,30 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
   const fpdf = await ext.$$eval(".campo", cs => Object.fromEntries(cs.map(c => [c.dataset.k, c.querySelector("input").value])));
   const nImgs = await ext.$$eval("#fImg img", x => x.length);
   confere("PDF: 2 páginas lidas e ficha montada", nImgs === 2 && azure === 2 && fpdf.nome === "CARLA MENDES ROCHA" && fpdf.mae === "JOANA PEREIRA ROCHA", `páginas ${nImgs}, leituras ${azure}`);
+  // ---------- Importar do Yuh Scanner do PC (o app de verdade, se YUH_BIN apontar o executável) ----------
+  if (process.env.YUH_BIN){
+    const os = require("os"), { spawn } = require("child_process");
+    const dados = fs.mkdtempSync(path.join(os.tmpdir(), "yuh-dados-"));
+    fs.writeFileSync(path.join(dados, "ponte.json"), JSON.stringify([{ id: "t1", nome: "RG Carla (teste)", tipo: "pdf", arquivos: [path.join(__dirname, "doc.pdf")], paginas: 2, quando: new Date().toISOString() }]));
+    const yuh = spawn(process.env.YUH_BIN, ["-addr", "127.0.0.1:8799"], { env: { ...process.env, YUH_DADOS: dados, YUH_SEM_ATUALIZACAO: "1" }, stdio: "ignore" });
+    try {
+      await new Promise(r => setTimeout(r, 1500));
+      // um site comum NÃO pode ler a ponte
+      const bloqueado = await pg.evaluate(() => fetch("http://127.0.0.1:47321/v1/docs").then(r => r.status).catch(() => "erro"));
+      confere("ponte: site comum é bloqueado", bloqueado !== 200, String(bloqueado));
+      azure = 0;
+      await ext.goto(ext.url().replace(/#.*$/, ""));
+      await ext.waitForFunction(() => !document.querySelector("#chipPc").classList.contains("off"), null, { timeout: 5000 }).catch(() => {});
+      confere("ponte: chip do PC aceso", !(await ext.evaluate(() => document.querySelector("#chipPc").classList.contains("off"))));
+      await ext.click("#impYuh");
+      await ext.waitForSelector("#listaPc .doc", { timeout: 8000 });
+      confere("ponte: lista mostra o documento salvo", /RG Carla \(teste\)/.test(await ext.textContent("#listaPc")));
+      await ext.click("#listaPc .doc");
+      await ext.waitForSelector(".campo input", { timeout: 30000 });
+      const fpc = await ext.$$eval(".campo", cs => Object.fromEntries(cs.map(c => [c.dataset.k, c.querySelector("input").value])));
+      confere("ponte: importou e leu (2 páginas)", azure === 2 && fpc.nome === "CARLA MENDES ROCHA", `leituras ${azure}`);
+    } finally { yuh.kill(); }
+  }
   confere("nenhum site foi enviado", !(await pg.evaluate(() => window.enviado)));
   confere("sem erros no painel", erros.length === 0, erros.join(" | "));
   console.log(falhas.length ? `\n${falhas.length} FALHA(S): ${falhas.join("; ")}` : "\nTUDO CERTO");

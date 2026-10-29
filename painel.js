@@ -2,6 +2,7 @@
 import * as banco from "./lib/banco.js";
 import { prepararFoto, lerFoto } from "./lib/azure.js";
 import { paginasDoPdf, MAX_PAGINAS } from "./lib/pdf.js";
+import { yuhAberto, listarDoPc, baixarDoPc } from "./lib/yuhpc.js";
 import { montarFicha, tituloDoc, completar, valorDaReceita, descreverReceita, DADOS, NOME_DADO } from "./lib/ficha.js";
 import { assinatura, chaveDoSite, mapearPorDicionario } from "./lib/campos.js";
 import { mapearComIA, temIA } from "./lib/gemini.js";
@@ -32,7 +33,7 @@ async function desenharLista(novoId){
   tela = "lista"; docAberto = null;
   const c = C(); c.innerHTML = "";
   c.insertAdjacentHTML("beforeend", `<div class="importar">
-    <button class="imp" id="impYuh" disabled title="Próxima etapa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="8" rx="1.5"/><path d="M6 11V5h9l3 3v3"/><path d="M7 15h10"/></svg>Importar do Yuh Scanner<small>em breve</small></button>
+    <button class="imp" id="impYuh"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="8" rx="1.5"/><path d="M6 11V5h9l3 3v3"/><path d="M7 15h10"/></svg>Importar do Yuh Scanner<small>Digitalizados neste PC</small></button>
     <button class="imp" id="impArq"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 18v-6M9 15l3-3 3 3"/></svg>Importar documentos<small>PDF ou foto do computador</small></button>
   </div>`);
   const lista = await banco.docs();
@@ -40,7 +41,8 @@ async function desenharLista(novoId){
   if (!lista.length) c.insertAdjacentHTML("beforeend", `<div class="vazio-p">Nenhum ainda. Clique em <b>Importar documentos</b> e escolha a foto (ou frente e verso) de um RG, CNH ou certidão.</div>`);
   for (const d of lista){
     const b = document.createElement("button"); b.className = "doc" + (d.id === novoId ? " novo" : "");
-    b.innerHTML = `<img alt=""><span class="inf"><b></b><small></small></span><span class="origem">🖥 PC</span>`;
+    b.innerHTML = `<img alt=""><span class="inf"><b></b><small></small></span><span class="origem"></span>`;
+    b.querySelector(".origem").textContent = d.origem || "🖥 PC";
     b.querySelector("img").src = d.imagens[0]; b.querySelector("b").textContent = d.titulo;
     const n = Object.values(d.dados).filter(x => x.situacao === "duvida").length;
     b.querySelector("small").textContent = `${d.tipo === "Desconhecido" ? "Documento" : d.tipo} · ${n ? n + " para conferir" : "tudo lido"}`;
@@ -51,6 +53,51 @@ async function desenharLista(novoId){
   if (!cfg.azurePonto) c.insertAdjacentHTML("beforeend", `<div class="mapa">${ICO.info}<span><b>Falta configurar a leitura.</b> Toque na engrenagem ⚙ no topo e cole o endereço e a chave do Azure.</span></div>`);
   await notaDoSite(c);
   $("impArq").onclick = () => $("arq").click();
+  $("impYuh").onclick = () => importarDoYuh();
+  atualizarChipPc();
+}
+async function atualizarChipPc(){
+  const ok = await yuhAberto(), ch = $("chipPc"); if (!ch) return;
+  ch.className = "chip" + (ok ? "" : " off");
+  ch.innerHTML = `<i></i>${ok ? "Yuh Scanner do PC" : "Yuh Scanner do PC · fechado"}`;
+  ch.title = ok ? "Yuh Scanner para Windows aberto neste PC" : "Abra o Yuh Scanner neste PC para importar o que você digitalizou";
+}
+
+// ================= importar do Yuh Scanner do PC =================
+async function importarDoYuh(){
+  tela = "yuh";
+  const c = C(); c.innerHTML = "";
+  c.insertAdjacentHTML("beforeend", `<button class="voltar" id="vv">‹ Voltar</button><div class="p-sec"><span>Últimos documentos salvos no Yuh Scanner deste PC</span></div><div id="listaPc" class="campos"><div class="lendo"><img class="kuru" src="${KURU}" alt=""><span>Procurando o Yuh Scanner…</span></div></div>`);
+  $("vv").onclick = () => desenharLista();
+  let docs;
+  try { docs = await listarDoPc(); }
+  catch {
+    $("listaPc").innerHTML = `<div class="vazio-p">Não encontrei o Yuh Scanner aberto neste PC.<br>Abra o Yuh Scanner (versão 0.8 ou mais nova) e tente de novo.</div><button class="btn leve" id="tentar">Tentar de novo</button>`;
+    $("tentar").onclick = importarDoYuh; return;
+  }
+  const L = $("listaPc"); L.innerHTML = "";
+  if (!docs.length){ L.innerHTML = `<div class="vazio-p">Nada salvo no Yuh Scanner nas últimas 24 horas.<br>Digitalize, clique em <b>Salvar</b> lá e volte aqui.</div>`; return; }
+  for (const d of docs){
+    const b = document.createElement("button"); b.className = "doc";
+    const quando = new Date(d.quando);
+    b.innerHTML = `<img alt=""><span class="inf"><b></b><small></small></span><span class="origem">🖥 PC</span>`;
+    b.querySelector("b").textContent = d.nome;
+    b.querySelector("small").textContent = `${d.tipo === "pdf" ? "PDF" : "Imagem"} · ${d.paginas} pág. · ${quando.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`;
+    b.onclick = async () => {
+      b.disabled = true;
+      try { lerArquivos(await baixarDoPc(d), "🖥 PC"); }
+      catch (e) { b.disabled = false; aviso(e.message || String(e)); }
+    };
+    L.append(b);
+    miniaturaPc(d, b.querySelector("img"));
+  }
+}
+async function miniaturaPc(d, img){
+  try {
+    const [arq] = await baixarDoPc({ ...d, arquivos: 1 });
+    const blob = arq.type === "application/pdf" ? (await paginasDoPdf(arq, 1)).fotos[0]?.blob : arq;
+    if (blob) img.src = URL.createObjectURL(blob);
+  } catch {}
 }
 async function notaDoSite(c){
   const t = await abaAtual(); if (!t || !podeMexer(t.url)) return;
@@ -59,9 +106,9 @@ async function notaDoSite(c){
 }
 
 // ================= importar e ler =================
-$("arq").onchange = async () => {
-  const fs = [...$("arq").files]; $("arq").value = ""; if (!fs.length) return;
-  const c = C(); c.innerHTML = "";
+$("arq").onchange = () => { const fs = [...$("arq").files]; $("arq").value = ""; if (fs.length) lerArquivos(fs, "🖥 PC"); };
+async function lerArquivos(fs, origem){
+  const c = C(); c.innerHTML = ""; tela = "lendo";
   c.insertAdjacentHTML("beforeend", `<button class="voltar" id="vv">‹ Documentos</button><div class="ficha-img" id="fImg"></div><div class="lendo" id="fLendo"><img class="kuru" src="${KURU}" alt=""><span id="fMsg">Preparando ${fs.length > 1 ? "as fotos" : "a foto"}…</span></div>`);
   $("vv").onclick = () => desenharLista();
   try {
@@ -82,14 +129,14 @@ $("arq").onchange = async () => {
       for (const [k, v] of r.conf) conf.set(k, Math.min(conf.get(k) ?? 1, v));
     }
     const ficha = montarFicha(textos.join("\n"), conf);
-    const doc = { id: crypto.randomUUID(), criado: Date.now(), tipo: ficha.tipo, dados: ficha.dados, imagens: fotos.map(f => f.miniatura) };
+    const doc = { id: crypto.randomUUID(), criado: Date.now(), tipo: ficha.tipo, dados: ficha.dados, imagens: fotos.map(f => f.miniatura), origem };
     doc.titulo = tituloDoc(doc);
     await banco.salvarDoc(doc);
     abrirFicha(doc.id);
   } catch (e) {
     $("fLendo").outerHTML = `<div class="erro">${esc(e.message || e)}</div>`;
   }
-};
+}
 
 // ================= ficha =================
 async function abrirFicha(id){
