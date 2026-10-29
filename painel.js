@@ -1,6 +1,7 @@
 // Yuh Extension — painel lateral.
 import * as banco from "./lib/banco.js";
 import { prepararFoto, lerFoto } from "./lib/azure.js";
+import { paginasDoPdf, MAX_PAGINAS } from "./lib/pdf.js";
 import { montarFicha, tituloDoc, completar, valorDaReceita, descreverReceita, DADOS, NOME_DADO } from "./lib/ficha.js";
 import { assinatura, chaveDoSite, mapearPorDicionario } from "./lib/campos.js";
 import { mapearComIA, temIA } from "./lib/gemini.js";
@@ -32,7 +33,7 @@ async function desenharLista(novoId){
   const c = C(); c.innerHTML = "";
   c.insertAdjacentHTML("beforeend", `<div class="importar">
     <button class="imp" id="impYuh" disabled title="Próxima etapa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="8" rx="1.5"/><path d="M6 11V5h9l3 3v3"/><path d="M7 15h10"/></svg>Importar do Yuh Scanner<small>em breve</small></button>
-    <button class="imp" id="impArq"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 18v-6M9 15l3-3 3 3"/></svg>Importar documentos<small>Fotos (frente e verso juntas)</small></button>
+    <button class="imp" id="impArq"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 18v-6M9 15l3-3 3 3"/></svg>Importar documentos<small>PDF ou foto do computador</small></button>
   </div>`);
   const lista = await banco.docs();
   c.insertAdjacentHTML("beforeend", `<div class="p-sec"><span>Documentos lidos</span><span>somem sozinhos em 24 h</span></div>`);
@@ -65,7 +66,15 @@ $("arq").onchange = async () => {
   $("vv").onclick = () => desenharLista();
   try {
     const fotos = [];
-    for (const f of fs){ const p = await prepararFoto(f); fotos.push(p); const im = document.createElement("img"); im.src = p.miniatura; $("fImg").append(im); }
+    const mostrar = p => { fotos.push(p); const im = document.createElement("img"); im.src = p.miniatura; $("fImg").append(im); };
+    for (const f of fs){
+      if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)){
+        $("fMsg").textContent = "Abrindo o PDF…";
+        const { fotos: pgs, total } = await paginasDoPdf(f);
+        if (total > MAX_PAGINAS) aviso(`O PDF tem ${total} páginas; li só as ${MAX_PAGINAS} primeiras.`);
+        for (const pg of pgs) mostrar(await prepararFoto(pg.blob));
+      } else mostrar(await prepararFoto(f));
+    }
     const textos = [], conf = new Map();
     for (let i = 0; i < fotos.length; i++){
       $("fMsg").textContent = fotos.length > 1 ? `Lendo a foto ${i + 1} de ${fotos.length}…` : "Lendo o documento…";

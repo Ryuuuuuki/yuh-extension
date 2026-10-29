@@ -142,6 +142,14 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
   confere("memória: não chamou a IA de novo", gemini === antes, `chamadas ${antes}→${gemini}`);
   console.log("depois do reload:", JSON.stringify(v));
   confere("memória: lembrou o que foi ensinado", v.f_a === "CARLA MENDES ROCHA" && v.f_d === "");
+  // ---------- PDF (2 páginas: frente e verso) ----------
+  azure = 0;
+  await ext.click("#vv").catch(() => {}); await ext.goto(ext.url().replace(/#.*$/, ""));
+  await ext.setInputFiles("#arq", path.join(__dirname, "doc.pdf"));
+  await ext.waitForSelector(".campos", { timeout: 30000 });
+  const fpdf = await ext.$$eval(".campo", cs => Object.fromEntries(cs.map(c => [c.dataset.k, c.querySelector("input").value])));
+  const nImgs = await ext.$$eval("#fImg img", x => x.length);
+  confere("PDF: 2 páginas lidas e ficha montada", nImgs === 2 && azure === 2 && fpdf.nome === "CARLA MENDES ROCHA" && fpdf.mae === "JOANA PEREIRA ROCHA", `páginas ${nImgs}, leituras ${azure}`);
   confere("nenhum site foi enviado", !(await pg.evaluate(() => window.enviado)));
   confere("sem erros no painel", erros.length === 0, erros.join(" | "));
   console.log(falhas.length ? `\n${falhas.length} FALHA(S): ${falhas.join("; ")}` : "\nTUDO CERTO");
