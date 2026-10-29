@@ -272,7 +272,7 @@ async function abrirConfig(){
 
     <h3>IA para formulários novos · Gemini (grátis)</h3>
     <p>Crie a chave em <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> com sua conta Google. A IA recebe só os nomes dos campos dos sites, nunca dados de clientes.</p>
-    <div class="campo"><label>Chave do Gemini ${cfg.geminiChave ? '<span class="ok-txt">✓ guardada</span>' : ""}</label><input id="cGemini" type="password" placeholder="${cfg.geminiChave ? "(deixe em branco para manter)" : "cole a chave (começa com AIza)"}"></div>
+    <div class="campo"><label>Chave do Gemini ${cfg.geminiChave ? '<span class="ok-txt">✓ guardada</span>' : ""}</label><input id="cGemini" type="password" placeholder="${cfg.geminiChave ? "(deixe em branco para manter)" : "cole a chave do Google AI Studio"}"></div>
     <button class="btn principal" id="cSalvar">Salvar</button>
 
     <h3>Privacidade</h3>
@@ -287,7 +287,7 @@ async function abrirConfig(){
     const ponto = $("cPonto").value.trim().replace(/\/+$/, ""), chave = $("cChave").value.trim(), gem = $("cGemini").value.trim();
     if (ponto && !/^https:\/\/[\w.-]+\.(cognitiveservices\.azure\.com|api\.cognitive\.microsoft\.com)$/.test(ponto)) return aviso("O ponto de extremidade não parece certo (termina com cognitiveservices.azure.com).");
     if (chave && !/^\w{20,}$/.test(chave)) return aviso("A chave do Azure não parece certa.");
-    if (gem && !/^AIza[\w-]{20,}$/.test(gem)) return aviso("A chave do Gemini começa com AIza.");
+    if (gem && !/^[\w.\-]{20,}$/.test(gem)) return aviso("A chave do Gemini não parece certa (copie ela inteira, sem espaços).");
     const novo = { azurePonto: ponto }; if (chave) novo.azureChave = chave; if (gem) novo.geminiChave = gem;
     await banco.salvarConfig(novo); aviso("Salvo."); abrirConfig();
   };
