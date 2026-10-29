@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Yuh Extension",
+  "short_name": "Yuh",
+  "version": "0.1.0",
+  "description": "Lê documentos digitalizados e preenche formulários de sites. Nunca envia nada sozinha: quem confere e envia é você.",
+  "icons": { "16": "icones/icone-16.png", "32": "icones/icone-32.png", "48": "icones/icone-48.png", "128": "icones/icone-128.png" },
+  "action": { "default_title": "Yuh Extension", "default_icon": { "16": "icones/icone-16.png", "32": "icones/icone-32.png" } },
+  "side_panel": { "default_path": "painel.html" },
+  "background": { "service_worker": "servico.js" },
+  "permissions": ["sidePanel", "storage", "scripting", "activeTab", "tabs"],
+  "host_permissions": [
+    "<all_urls>",
+    "https://*.cognitiveservices.azure.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "minimum_chrome_version": "116"
+}

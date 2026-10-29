@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>gov.exemplo — Solicitação</title>
+<style>body{font-family:sans-serif;margin:30px}.f{display:flex;flex-direction:column;gap:12px;max-width:500px}.mui{position:relative}.mui span{font-size:12px;color:#666;display:block}input,select{padding:8px;width:100%}</style></head><body>
+<h1>Solicitação online</h1>
+<div id="app"></div>
+<p>Estado interno (como o React guarda): <code id="estado">{}</code></p>
+<iframe id="quadro" style="width:520px;height:160px;border:1px solid #ccc" srcdoc='<html><body style="font-family:sans-serif"><h3>Documento</h3><div><span id="l1">Número da Carteira de Identidade</span><input aria-labelledby="l1" id="rgq"></div><div><input placeholder="Órgão expedidor" id="org"></div><div><input aria-label="Data de emissão" type="date" id="dte"></div></body></html>'></iframe>
+<script>
+// imita um formulário React "controlado": o valor só vale se o site receber o evento de input
+const estado = {};
+const campos = [["nomeCompleto","Nome civil completo"],["cpfTitular","CPF do titular"],["dn","Data de nascimento","text","DD/MM/AAAA"],["genitora","Genitora"],["genitor","Genitor"],["municipio","Município de nascimento"],["sexoSel","Gênero","select"],["obs","Observações"]];
+const app = document.getElementById("app"); const f = document.createElement("div"); f.className = "f"; app.append(f);
+for (const [id, rot, tipo, ph] of campos){
+  const w = document.createElement("div"); w.className = "mui";
+  w.innerHTML = `<span>${rot}</span>` + (tipo === "select" ? `<select id="${id}"><option value=""></option><option value="F">Feminino</option><option value="M">Masculino</option><option value="O">Outro</option></select>` : `<input id="${id}" placeholder="${ph || ""}">`);
+  f.append(w);
+  const el = w.querySelector("input,select");
+  el.addEventListener(el.tagName === "SELECT" ? "change" : "input", e => { estado[id] = e.target.value; document.getElementById("estado").textContent = JSON.stringify(estado); });
+}
+</script></body></html>
