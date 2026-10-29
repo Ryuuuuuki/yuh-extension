@@ -23,7 +23,7 @@ async function abaAtual(){
   if (ABA_TESTE) return chrome.tabs.get(ABA_TESTE);
   const [t] = await chrome.tabs.query({ active: true, currentWindow: true }); return t;
 }
-const OCULTOS = new Set(["orgaoComUf"]); // calculados a partir de outros campos
+const OCULTOS = new Set(["orgaoComUf", "filiacao1", "filiacao2", "tipoPessoa"]); // calculados a partir de outros campos
 const podeMexer = url => /^(https?|file):/.test(url || "") && !/^https:\/\/(chrome\.google\.com\/webstore|chromewebstore\.google\.com)/.test(url);
 
 // ================= lista =================
@@ -103,6 +103,7 @@ async function abrirFicha(id){
   F.querySelectorAll(".campo input").forEach(i => i.onchange = async () => {
     const k = i.closest(".campo").dataset.k, v = i.value.trim();
     if (v) d.dados[k] = { valor: v, situacao: "ok", porque: "" }; else delete d.dados[k];
+    for (const f of ["filiacao1", "filiacao2"]) if (d.dados[f]?.de === k){ if (v) d.dados[f] = { ...d.dados[f], valor: v }; else delete d.dados[f]; }
     if (d.dados.orgao && d.dados.orgaoUf) d.dados.orgaoComUf = { valor: `${d.dados.orgao.valor}/${d.dados.orgaoUf.valor}`, situacao: [d.dados.orgao, d.dados.orgaoUf].some(x => x.situacao === "duvida") ? "duvida" : "ok", porque: "" }; else delete d.dados.orgaoComUf;
     const cp = i.closest(".campo"); cp.classList.remove("duvida"); cp.querySelector(".duv")?.remove(); cp.querySelector("small")?.remove();
     d.titulo = tituloDoc(d); await banco.salvarDoc(d);
@@ -160,23 +161,31 @@ async function preencher(d){
   const site = chaveDoSite(tab.url), aprendido = await banco.mapaDoSite(site);
   const { mapa, origem } = mapearPorDicionario(campos, aprendido);
   let erroIA = "";
-  const desconhecidos = campos.filter(c => mapa[c.id] == null);
+  // site novo + IA ligada: a IA lê o formulário inteiro e faz a relação dos campos.
+  // Nas próximas visitas vale o que foi aprendido (sem gastar IA). Sem IA, fica o dicionário.
+  const siteNovo = !Object.keys(aprendido).length;
+  const iaLigada = await temIA();
+  const desconhecidos = siteNovo && iaLigada ? campos.filter(c => origem[c.id] !== "memoria") : campos.filter(c => mapa[c.id] == null);
   if (desconhecidos.length){
-    if (await temIA()){
+    if (iaLigada){
       const k = document.createElement("div"); k.className = "lendo"; k.id = "lendoIA";
       k.innerHTML = `<img class="kuru" src="${KURU}" alt=""><span>Lendo o formulário com IA… (só os nomes dos campos)</span>`;
       bt.closest(".preencher").before(k); k.scrollIntoView({ block: "nearest" });
       bt.textContent = "Entendendo o formulário…";
       try {
         const ia = await mapearComIA(campos);
-        for (const c of desconhecidos){ mapa[c.id] = ia[c.id] || "-"; origem[c.id] = mapa[c.id] === "-" ? "ia-nada" : "ia"; }
+        for (const c of desconhecidos){
+          const k = ia[c.id] || "-";
+          if (k === mapa[c.id]) continue;               // dicionário e IA concordam: fica verde
+          mapa[c.id] = k; origem[c.id] = k === "-" ? "ia-nada" : "ia";
+        }
       } catch (e) { erroIA = e.message || String(e); }
       k.remove();
     } else erroIA = "sem IA configurada";
   }
   // guarda o que aprendeu (dicionário e IA); o que ficou sem resposta não é guardado
   const novo = {};
-  for (const c of campos) if (mapa[c.id] != null && origem[c.id] !== "memoria") novo[assinatura(c)] = mapa[c.id];
+  for (const c of campos) if (/^ia/.test(origem[c.id] || "")) novo[assinatura(c)] = mapa[c.id];
   if (Object.keys(novo).length) await banco.salvarMapa(site, novo);
 
   bt.textContent = "Preenchendo…";

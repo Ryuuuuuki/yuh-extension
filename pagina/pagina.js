@@ -27,6 +27,13 @@
     const lb = el.getAttribute("aria-labelledby");
     if (lb){ const t = so(lb.split(/\s+/).map(id => document.getElementById(id)?.textContent || "").join(" ")); if (curto(t)) return t; }
     const al = el.getAttribute("aria-label"); if (curto(so(al))) return so(al);
+    // <label> sem "for" logo depois do campo (rótulo flutuante, comum em Bootstrap)
+    for (let n = el, nivel = 0; n && nivel < 2; n = n.parentElement, nivel++){
+      const prox = n.nextElementSibling;
+      if (prox && prox.tagName === "LABEL" && !prox.htmlFor && !prox.querySelector("input,select,textarea")){ const t = textoSemCampos(prox); if (curto(t)) return t; }
+      const irmaoLabel = n.parentElement && [...n.parentElement.children].find(x => x !== n && x.tagName === "LABEL" && !x.htmlFor && !x.querySelector("input,select,textarea"));
+      if (irmaoLabel && n.parentElement.querySelectorAll("input,select,textarea").length === 1){ const t = textoSemCampos(irmaoLabel); if (curto(t)) return t; }
+    }
     // tabela: célula da esquerda, ou cabeçalho da coluna
     const td = el.closest("td,th");
     if (td){
@@ -67,12 +74,32 @@
     return ultimo.slice(0, 60);
   }
 
+  // o campo está escondido atrás de outra janela (ex.: tela de fundo atrás de um diálogo)?
+  function coberto(el){
+    const r = el.getBoundingClientRect();
+    let x = r.left + r.width / 2, y = r.top + r.height / 2, w = window, alvo = el;
+    for (let passos = 0; passos < 8; passos++){
+      if (x < 0 || y < 0 || x > w.innerWidth || y > w.innerHeight) return false; // fora da tela: não dá para saber
+      const hit = w.document.elementFromPoint(x, y);
+      if (!hit) return false;
+      let perto = alvo;
+      if (!/^(IFRAME|FRAME)$/.test(alvo.tagName)) for (let i = 0; i < 3 && perto.parentElement && !/^(BODY|HTML|FORM)$/.test(perto.parentElement.tagName); i++) perto = perto.parentElement;
+      if (!(hit === alvo || perto.contains(hit))) return true;
+      if (w === w.top) return false;
+      let fe; try { fe = w.frameElement; } catch { return false; }
+      if (!fe) return false;
+      const fr = fe.getBoundingClientRect();
+      x += fr.left + fe.clientLeft; y += fr.top + fe.clientTop; alvo = fe; w = w.parent;
+    }
+    return false;
+  }
+
   function varrer(){
     const campos = [], radios = new Set();
     for (const el of document.querySelectorAll("input,select,textarea")){
       const tipo = el.tagName === "INPUT" ? (el.type || "text").toLowerCase() : el.tagName.toLowerCase();
       if (/^(hidden|submit|button|reset|image|file|password|checkbox|color|range|search)$/.test(tipo)) continue;
-      if (el.disabled || el.readOnly || !visivel(el)) continue;
+      if (el.disabled || el.readOnly || !visivel(el) || coberto(el)) continue;
       if (tipo === "radio"){ if (!el.name || radios.has(el.name)) continue; radios.add(el.name); }
       if (!el.dataset.yuh) el.dataset.yuh = String(++seq);
       const c = { id: el.dataset.yuh, tipo, rotulo: limpaRot(rotulo(el)), nome: el.getAttribute("name") || el.id || "", placeholder: so(el.getAttribute("placeholder")), contexto: contexto(el), max: el.maxLength > 0 ? el.maxLength : 0 };

@@ -95,6 +95,22 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
   console.log("iframe:", qv);
   confere("moderno: dentro do iframe", qv[0] === "52998224725" && qv[1] === "SSP" && qv[2] === "2024-12-05");
 
+  // ---------- imitação do VizWise: janela por cima de outra tela, quadros dentro de quadros ----------
+  ({ pg, ext } = await painelDe("vizwise", "vizwise.html"));
+  await pg.waitForTimeout(500);
+  await ext.click(".doc"); await ext.waitForSelector("#bPreencher");
+  console.log("\n[vizwise]", (await preencherEm(ext)).replace(/\s+/g, " ").slice(0, 220));
+  const fr = n => pg.frames().find(f => f.url().endsWith(n));
+  v = await fr("viz-firma.html").evaluate(() => Object.fromEntries([...document.querySelectorAll("input,select")].map(e => [e.id, e.value])));
+  const bal = await fr("viz-balcao.html").evaluate(() => [...document.querySelectorAll("input")].map(e => e.value).join(""));
+  console.log(JSON.stringify(v), "balcão:", JSON.stringify(bal));
+  confere("vizwise: Tipo CPF e CPF\\CNPJ", v.tp === "CPF" && v.doc === "529.982.247-25");
+  confere("vizwise: sexo com rótulo depois da caixa", v.sx === "F");
+  confere("vizwise: UF Exped.", v.ufe === "BA" && v.oe === "SSP" && v.rg === "52998224725");
+  confere("vizwise: filiação 1 e 2 na ordem do documento", v.f1 === "JOANA PEREIRA ROCHA" && v.f2 === "MARCOS MENDES ROCHA");
+  confere("vizwise: validade do passaporte, e-mail e profissão em branco", v.vp === "" && v.em === "" && v.pr === "");
+  confere("vizwise: tela de fundo (Balcão) intocada", bal === "");
+
   // ---------- estranho: sem IA, depois com IA, depois memória ----------
   ({ pg, ext } = await painelDe("estranho", "estranho.html"));
   await ext.click(".doc"); await ext.waitForSelector("#bPreencher");
@@ -117,9 +133,12 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
   confere("ensinar: guardou no mapa do site", JSON.stringify(mapas).includes('"-"'));
   // memória: recarrega o site e preenche de novo sem chamar a IA
   const antes = gemini;
-  await pg.reload(); await ext.click("#bPreencher"); await ext.waitForFunction(() => !/Preenchendo|Entendendo/.test(document.querySelector("#bPreencher").textContent), null, { timeout: 20000 });
+  await pg.reload(); await pg.waitForLoadState("load");
+  await ext.evaluate(() => document.querySelectorAll(".resultado").forEach(x => x.remove()));
+  await ext.click("#bPreencher"); await ext.waitForSelector(".resultado", { timeout: 20000 });
   v = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll("input")].map(e => [e.name, e.value])));
   confere("memória: não chamou a IA de novo", gemini === antes, `chamadas ${antes}→${gemini}`);
+  console.log("depois do reload:", JSON.stringify(v));
   confere("memória: lembrou o que foi ensinado", v.f_a === "CARLA MENDES ROCHA" && v.f_d === "");
   confere("nenhum site foi enviado", !(await pg.evaluate(() => window.enviado)));
   confere("sem erros no painel", erros.length === 0, erros.join(" | "));
