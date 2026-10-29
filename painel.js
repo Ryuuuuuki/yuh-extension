@@ -123,7 +123,12 @@ async function varrerAba(tab){
   await injetar(tab.id);
   const r = await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, func: () => window.__yuh && window.__yuh.varrer() });
   const campos = [];
-  for (const fr of r) if (fr.result) for (const c of fr.result.campos) campos.push({ ...c, id: `${fr.frameId}:${c.id}`, frame: fr.frameId, idLocal: c.id });
+  for (const fr of r){
+    if (!fr.result) continue;
+    const cs = fr.result.campos, cobertos = cs.filter(c => c.coberto).length;
+    if (cs.length && cobertos / cs.length > 0.4) continue;   // tela de fundo, atrás de outra janela
+    for (const c of cs) if (!c.coberto) campos.push({ ...c, id: `${fr.frameId}:${c.id}`, frame: fr.frameId, idLocal: c.id });
+  }
   return campos;
 }
 async function limparMarcas(){

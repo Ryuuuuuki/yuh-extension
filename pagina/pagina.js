@@ -108,12 +108,12 @@
     for (const el of document.querySelectorAll("input,select,textarea")){
       const tipo = el.tagName === "INPUT" ? (el.type || "text").toLowerCase() : el.tagName.toLowerCase();
       if (/^(hidden|submit|button|reset|image|file|password|checkbox|color|range|search)$/.test(tipo)) continue;
-      if (el.disabled || el.readOnly || !visivel(el) || coberto(el)) continue;
+      if (el.disabled || el.readOnly || !visivel(el)) continue;
       if (tipo === "radio"){ if (!el.name || radios.has(el.name)) continue; radios.add(el.name); }
       if (!el.dataset.yuh) el.dataset.yuh = String(++seq);
       const r = el.getBoundingClientRect();
       const c = { id: el.dataset.yuh, tipo, rotulo: limpaRot(rotulo(el)), nome: el.getAttribute("name") || el.id || "", placeholder: so(el.getAttribute("placeholder")), contexto: contexto(el), max: el.maxLength > 0 ? el.maxLength : 0,
-        pos: [Math.round(r.left + scrollX), Math.round(r.top + scrollY), Math.round(r.width)], ajuda: ajuda(el) };
+        pos: [Math.round(r.left + scrollX), Math.round(r.top + scrollY), Math.round(r.width)], ajuda: ajuda(el), coberto: coberto(el) };
       if (tipo === "select") c.opcoes = [...el.options].map(o => so(o.textContent)).filter(Boolean).slice(0, 80);
       if (tipo === "radio"){
         const grupo = [...document.querySelectorAll(`input[type=radio][name="${CSS.escape(el.name)}"]`)];
@@ -182,7 +182,7 @@
         if (el.tagName === "SELECT"){
           const i = melhorOpcao([...el.options].map(o => o.textContent + "|" + o.value).map(t => t.split("|")[0]), it.valor);
           const j = i >= 0 ? i : melhorOpcao([...el.options].map(o => o.value), it.valor);
-          if (j < 0){ res.push({ id: it.id, ok: false, motivo: `não há a opção “${it.valor}”` }); pintar(el, "duvida"); continue; }
+          if (j < 0){ res.push({ id: it.id, ok: false, motivo: `não há a opção “${it.valor}”` }); continue; }
           porValor(el, el.options[j].value);
         } else if (el.type === "radio"){
           const grupo = [...document.querySelectorAll(`input[type=radio][name="${CSS.escape(el.name)}"]`)];

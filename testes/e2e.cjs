@@ -109,7 +109,8 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
   confere("vizwise: UF Exped.", v.ufe === "BA" && v.oe === "SSP" && v.rg === "52998224725");
   confere("vizwise: filiação 1 e 2 na ordem do documento", v.f1 === "JOANA PEREIRA ROCHA" && v.f2 === "MARCOS MENDES ROCHA");
   confere("vizwise: validade do passaporte, e-mail e profissão em branco", v.vp === "" && v.em === "" && v.pr === "");
-  confere("vizwise: tela de fundo (Balcão) intocada", bal === "");
+  confere("vizwise: tela de fundo (Balcão) intocada", bal === "" && await fr("viz-balcao.html").evaluate(() => document.querySelector("#bt").value === "" && !document.querySelector("[data-yuh-estilo]")));
+  confere("vizwise: Tipo Doc 2 intocado e sem pintura", v.td2 === "" && await fr("viz-firma.html").evaluate(() => !document.querySelector("#td2").dataset.yuhEstilo));
 
   // ---------- estranho: sem IA, depois com IA, depois memória ----------
   ({ pg, ext } = await painelDe("estranho", "estranho.html"));
