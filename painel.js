@@ -2,7 +2,7 @@
 import * as banco from "./lib/banco.js";
 import { prepararFoto, lerFoto } from "./lib/azure.js";
 import { paginasDoPdf, MAX_PAGINAS } from "./lib/pdf.js";
-import { yuhAberto, listarDoPc, baixarDoPc, gradeAtual, baixarGrade } from "./lib/yuhpc.js";
+import { yuhAberto, listarDoPc, baixarDoPc, gradeAtual, baixarGrade, recursosDoYuh } from "./lib/yuhpc.js";
 import { montarFicha, tituloDoc, completar, valorDaReceita, descreverReceita, DADOS, NOME_DADO } from "./lib/ficha.js";
 import { assinatura, chaveDoSite, mapearPorDicionario } from "./lib/campos.js";
 import { mapearComIA, temIA } from "./lib/gemini.js";
@@ -77,8 +77,11 @@ async function importarDoYuh(){
   }
   const L = $("listaPc"); L.innerHTML = `<div class="lendo" id="lendoGrade"><img class="kuru" src="${KURU}" alt=""><span>Pegando o que está na tela do Yuh Scanner…</span></div>`;
   // 1º: o que está no grid agora (mesmo sem salvar)
-  const g = await gradeAtual();
+  const recursos = await recursosDoYuh() || [];
+  const g = recursos.includes("grade") ? await gradeAtual() : null;
   $("lendoGrade")?.remove();
+  if (!recursos.includes("grade")) L.insertAdjacentHTML("beforeend", `<div class="mapa">${ICO.info}<span><b>Este Yuh Scanner é de uma versão antiga</b> e só mostra o que foi salvo. Para pegar também o que está na tela sem salvar, abra a versão mais nova.</span></div>`);
+  else if (!g) L.insertAdjacentHTML("beforeend", `<div class="vazio-p">Não consegui pegar o que está na tela do Yuh Scanner (a janela não respondeu). Tente de novo.</div>`);
   if (g && g.paginas > 0){
     const b = document.createElement("button"); b.className = "doc";
     b.innerHTML = `<img alt=""><span class="inf"><b></b><small></small></span><span class="origem">na tela</span>`;
