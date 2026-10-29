@@ -13,7 +13,7 @@ Chrome MV3, painel lateral (`painel.html/js/css`), sem build. Lê documento → 
   mudou um, copie para o outro.
 - `lib/ficha.js` desmembra (SSP/BA → orgao + orgaoUf; "GUARULHOS, SP" → naturalidade + natUf; CIN: rg = CPF).
 - Mapeamento: memória do site (`mapas` por `chaveDoSite`, só guarda IA e correções; versão em `mapasVersao`) → em site novo com IA ligada, o **Gemini mapeia o formulário inteiro** (onde concorda com o dicionário fica verde) → senão dicionário (`lib/campos.js`) + Gemini só nos desconhecidos
-  (`lib/gemini.js`, só rótulos; nunca dados — o teste falha se algum dado de cliente for na requisição).
+  (`lib/gemini.js`). A IA tem autonomia: recebe a estrutura (rótulo, seção, ajuda, opções, posição) e devolve uma **receita** por campo ("cpf", "{orgao}/{orgaoUf}", "=CPF", "-"); a Yuh monta o valor com os dados locais (`valorDaReceita` em `lib/ficha.js`). Nunca vão dados: textos com valores da ficha viram "(oculto)" e números longos viram "#" — o teste falha se algum dado de cliente for na requisição.
 - `pagina/pagina.js` é injetado em todos os quadros (iframes); usa o setter nativo + eventos input/change (React/Angular).
 - **Nunca enviar formulário / clicar botões.** Documentos somem em 24 h. Campos cobertos por outra janela (tela de fundo atrás de diálogo, mesmo em iframes) são ignorados.
 - Sistema real testado: **VizWise** (Cadastro de Firma, iframes aninhados, rótulo depois da caixa, "Filiação 1/2", seletor CPF/CNPJ). Imitação em `testes/sites/vizwise.html`.

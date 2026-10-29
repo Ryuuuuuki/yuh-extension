@@ -5,6 +5,7 @@
 (() => {
   if (window.__yuh) return;
   let seq = 0;
+  const CAMPO = "input:not([type=hidden]),select,textarea";
   const so = s => (s || "").replace(/\s+/g, " ").trim();
   const sem = s => so(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
   const limpaRot = s => so(s).replace(/[*:]+\s*$/, "").replace(/^\s*[*]+/, "").replace(/\(\s*obrigat[oó]rio\s*\)/i, "").trim().slice(0, 90);
@@ -30,29 +31,29 @@
     // <label> sem "for" logo depois do campo (rótulo flutuante, comum em Bootstrap)
     for (let n = el, nivel = 0; n && nivel < 2; n = n.parentElement, nivel++){
       const prox = n.nextElementSibling;
-      if (prox && prox.tagName === "LABEL" && !prox.htmlFor && !prox.querySelector("input,select,textarea")){ const t = textoSemCampos(prox); if (curto(t)) return t; }
-      const irmaoLabel = n.parentElement && [...n.parentElement.children].find(x => x !== n && x.tagName === "LABEL" && !x.htmlFor && !x.querySelector("input,select,textarea"));
-      if (irmaoLabel && n.parentElement.querySelectorAll("input,select,textarea").length === 1){ const t = textoSemCampos(irmaoLabel); if (curto(t)) return t; }
+      if (prox && prox.tagName === "LABEL" && !prox.htmlFor && !prox.querySelector(CAMPO)){ const t = textoSemCampos(prox); if (curto(t)) return t; }
+      const irmaoLabel = n.parentElement && [...n.parentElement.children].find(x => x !== n && x.tagName === "LABEL" && !x.htmlFor && !x.querySelector(CAMPO));
+      if (irmaoLabel && n.parentElement.querySelectorAll(CAMPO).length === 1){ const t = textoSemCampos(irmaoLabel); if (curto(t)) return t; }
     }
     // tabela: célula da esquerda, ou cabeçalho da coluna
     const td = el.closest("td,th");
     if (td){
       let p = td.previousElementSibling;
-      while (p){ const t = textoSemCampos(p); if (curto(t)) return t; if (p.querySelector("input,select,textarea")) break; p = p.previousElementSibling; }
+      while (p){ const t = textoSemCampos(p); if (curto(t)) return t; if (p.querySelector(CAMPO)) break; p = p.previousElementSibling; }
     }
     // texto logo antes (irmãos anteriores, subindo até 4 níveis)
     let n = el;
     for (let nivel = 0; nivel < 4 && n && n !== document.body; nivel++){
       let p = n.previousElementSibling, passos = 0;
       while (p && passos < 3){
-        if (p.matches("input,select,textarea") || p.querySelector("input,select,textarea")) { p = null; break; }
+        if (p.matches(CAMPO) || p.querySelector(CAMPO)) { p = null; break; }
         const t = textoSemCampos(p); if (curto(t)) return t;
         p = p.previousElementSibling; passos++;
       }
       // texto solto no mesmo pai antes do campo ("Nome: <input>")
       if (n.parentElement){
         let txt = "";
-        for (const c of n.parentElement.childNodes){ if (c === n) break; if (c.nodeType === 3) txt += c.textContent; else if (c.nodeType === 1 && !c.matches("input,select,textarea") && !c.querySelector("input,select,textarea")) txt += " " + c.textContent; else txt = ""; }
+        for (const c of n.parentElement.childNodes){ if (c === n) break; if (c.nodeType === 3) txt += c.textContent; else if (c.nodeType === 1 && c.matches("input[type=hidden]")) continue; else if (c.nodeType === 1 && !c.matches(CAMPO) && !c.querySelector(CAMPO)) txt += " " + c.textContent; else txt = ""; }
         if (curto(so(txt))) return so(txt);
       }
       n = n.parentElement;
@@ -94,6 +95,14 @@
     return false;
   }
 
+  // textos de ajuda perto do campo (dicas, exemplos de formato), sem o valor digitado
+  function ajuda(el){
+    const caixa = el.closest(".form-group,.field,.campo,td,li") || el.parentElement;
+    if (!caixa) return "";
+    const t = textoSemCampos(caixa).replace(limpaRot(rotulo(el)), "").trim();
+    return t.length > 2 && t.length < 100 ? t : "";
+  }
+
   function varrer(){
     const campos = [], radios = new Set();
     for (const el of document.querySelectorAll("input,select,textarea")){
@@ -102,7 +111,9 @@
       if (el.disabled || el.readOnly || !visivel(el) || coberto(el)) continue;
       if (tipo === "radio"){ if (!el.name || radios.has(el.name)) continue; radios.add(el.name); }
       if (!el.dataset.yuh) el.dataset.yuh = String(++seq);
-      const c = { id: el.dataset.yuh, tipo, rotulo: limpaRot(rotulo(el)), nome: el.getAttribute("name") || el.id || "", placeholder: so(el.getAttribute("placeholder")), contexto: contexto(el), max: el.maxLength > 0 ? el.maxLength : 0 };
+      const r = el.getBoundingClientRect();
+      const c = { id: el.dataset.yuh, tipo, rotulo: limpaRot(rotulo(el)), nome: el.getAttribute("name") || el.id || "", placeholder: so(el.getAttribute("placeholder")), contexto: contexto(el), max: el.maxLength > 0 ? el.maxLength : 0,
+        pos: [Math.round(r.left + scrollX), Math.round(r.top + scrollY), Math.round(r.width)], ajuda: ajuda(el) };
       if (tipo === "select") c.opcoes = [...el.options].map(o => so(o.textContent)).filter(Boolean).slice(0, 80);
       if (tipo === "radio"){
         const grupo = [...document.querySelectorAll(`input[type=radio][name="${CSS.escape(el.name)}"]`)];
@@ -157,6 +168,7 @@
     for (const a of alvo){ const i = T.indexOf(a); if (i >= 0) return i; }
     for (const a of alvo){ if (a.length < 2) continue; const i = T.findIndex(t => t.startsWith(a + " ") || t.startsWith(a + " -") || t.startsWith(a + "(") || t.endsWith(" " + a) || t.endsWith("- " + a)); if (i >= 0) return i; }
     for (const a of alvo){ if (a.length < 4) continue; const i = T.findIndex(t => t.includes(a)); if (i >= 0) return i; }
+    for (const a of alvo){ if (a.length < 4) continue; const i = T.findIndex(t => t.length >= 3 && a.startsWith(t)); if (i >= 0) return i; }
     return -1;
   }
   function paraData(v){ const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v); return m ? `${m[3]}-${m[2]}-${m[1]}` : v; }

@@ -25,8 +25,8 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
     gemini++;
     const pedido = JSON.parse(r.request().postData()).contents[0].parts[0].text;
     if (/CARLA|ROCHA|529\.982/.test(pedido)) falhas.push("DADO DE CLIENTE FOI PARA A IA");
-    const campos = JSON.parse(pedido.slice(pedido.indexOf("Campos:") + 7).trim());
-    const m = {}; for (const c of campos){ const t = c.rotulo.toLowerCase(); m[c.id] = /denomina/.test(t) ? "nome" : /cadastro de pessoas/.test(t) ? "cpf" : /materno/.test(t) ? "mae" : /paterno/.test(t) ? "pai" : "-"; }
+    const campos = JSON.parse(pedido.slice(pedido.indexOf("[", pedido.lastIndexOf("Campos"))).trim());
+    const m = {}; for (const c of campos){ const t = (c.rotulo || "").toLowerCase(); m[c.id] = /denomina/.test(t) ? "nome" : /cadastro de pessoas/.test(t) ? "cpf" : /materno/.test(t) ? "mae" : /paterno/.test(t) ? "pai" : /apresentado/.test(t) ? "=Carteira de Identidade" : /expedido por/.test(t) ? "{orgao}/{orgaoUf}" : "-"; }
     r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(m) }] } }] }) });
   });
 
@@ -121,8 +121,9 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
   await ext.click("#bPreencher"); await ext.waitForFunction(() => document.querySelector(".resultado") && !document.querySelector("#lendoIA") && !/Preenchendo|Entendendo/.test(document.querySelector("#bPreencher").textContent), null, { timeout: 20000 });
   txt = (await ext.textContent(".resultado")).replace(/\s+/g, " ");
   console.log("[estranho com IA]", txt.slice(0, 200));
-  v = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll("input")].map(e => [e.name, e.value])));
+  v = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll("input,select")].map(e => [e.name, e.value])));
   console.log(JSON.stringify(v), "chamadas Gemini:", gemini);
+  confere("IA monta valor: texto fixo e junção", v.f_h === "Carteira de Identidade" && v.f_i === "SSP/BA");
   confere("estranho: IA mapeou", v.f_a === "CARLA MENDES ROCHA" && v.f_b === "529.982.247-25" && v.f_c === "JOANA PEREIRA ROCHA" && v.f_d === "MARCOS MENDES ROCHA");
   confere("estranho: telefone e cônjuge intocados", v.f_e === "" && v.f_g === "");
   confere("estranho: campos da IA em amarelo", /para conferir/.test(txt));

@@ -1,7 +1,7 @@
 // Yuh Extension — painel lateral.
 import * as banco from "./lib/banco.js";
 import { prepararFoto, lerFoto } from "./lib/azure.js";
-import { montarFicha, tituloDoc, DADOS, NOME_DADO } from "./lib/ficha.js";
+import { montarFicha, tituloDoc, completar, valorDaReceita, descreverReceita, DADOS, NOME_DADO } from "./lib/ficha.js";
 import { assinatura, chaveDoSite, mapearPorDicionario } from "./lib/campos.js";
 import { mapearComIA, temIA } from "./lib/gemini.js";
 
@@ -86,6 +86,7 @@ $("arq").onchange = async () => {
 async function abrirFicha(id){
   const d = (await banco.docs()).find(x => x.id === id);
   if (!d) return desenharLista();
+  completar(d);
   tela = "ficha"; docAberto = d; ultimoPreenchimento = null;
   const c = C(); c.innerHTML = "";
   c.insertAdjacentHTML("beforeend", `<button class="voltar" id="vv">‹ Documentos</button>
@@ -133,8 +134,7 @@ async function preencherCampos(tabId, campos, mapa, origem, d){
   const porFrame = {};
   const itens = [];
   for (const c of campos){
-    const k = mapa[c.id]; if (!k || k === "-" || !d.dados[k]) continue;
-    const x = d.dados[k];
+    const x = valorDaReceita(mapa[c.id], d.dados); if (!x) continue;
     const situacao = x.situacao === "duvida" || origem[c.id] === "ia" ? "duvida" : "ok";
     (porFrame[c.frame] ||= []).push({ id: c.idLocal, valor: x.valor, situacao });
     itens.push(c.id);
@@ -169,11 +169,11 @@ async function preencher(d){
   if (desconhecidos.length){
     if (iaLigada){
       const k = document.createElement("div"); k.className = "lendo"; k.id = "lendoIA";
-      k.innerHTML = `<img class="kuru" src="${KURU}" alt=""><span>Lendo o formulário com IA… (só os nomes dos campos)</span>`;
+      k.innerHTML = `<img class="kuru" src="${KURU}" alt=""><span>A IA está lendo o formulário… (só a estrutura, nunca os dados)</span>`;
       bt.closest(".preencher").before(k); k.scrollIntoView({ block: "nearest" });
       bt.textContent = "Entendendo o formulário…";
       try {
-        const ia = await mapearComIA(campos);
+        const ia = await mapearComIA(campos, Object.keys(d.dados), Object.values(d.dados).map(x => x.valor));
         for (const c of desconhecidos){
           const k = ia[c.id] || "-";
           if (k === mapa[c.id]) continue;               // dicionário e IA concordam: fica verde
@@ -206,10 +206,10 @@ function mostrarResultado(d, erroIA){
     const k = mapa[c.id];
     if (k == null){ naoEntendi.push(c); continue; }
     if (k === "-") continue;
-    if (!d.dados[k]){ semDado.push(c.rotulo || NOME_DADO[k]); continue; }
+    if (!valorDaReceita(k, d.dados)){ semDado.push(c.rotulo || descreverReceita(k)); continue; }
     const r = res[c.id];
     if (!r || !r.ok){ falhou.push(`${c.rotulo}${r?.motivo ? ` (${r.motivo})` : ""}`); continue; }
-    (d.dados[k].situacao === "duvida" || origem[c.id] === "ia") ? amarelos++ : verdes++;
+    (valorDaReceita(k, d.dados).situacao === "duvida" || origem[c.id] === "ia") ? amarelos++ : verdes++;
   }
   const box = document.createElement("div"); box.className = "resultado" + (verdes + amarelos === 0 ? " ruim" : "");
   box.innerHTML = `<b>${verdes + amarelos ? "Pronto! Agora confira e envie no site." : "Não consegui preencher nada nesta página."}</b>
@@ -221,7 +221,9 @@ function mostrarResultado(d, erroIA){
     <span style="color:var(--tinta-2);font-size:12px">A Yuh Extension nunca clica em “Enviar”. Quem envia é você.</span>`;
   const p = $("bPreencher").closest(".preencher"); p.before(box);
   // ligações campo → dado (para corrigir/ensinar)
-  const opts = k => `<option value="">— não sei —</option><option value="-"${k === "-" ? " selected" : ""}>Não preencher</option>` + DADOS.map(([kk, r]) => `<option value="${kk}"${kk === k ? " selected" : ""}>${esc(r)}${d.dados[kk] ? "" : " (vazio)"}</option>`).join("");
+  const opts = k => `<option value="">— não sei —</option><option value="-"${k === "-" ? " selected" : ""}>Não preencher</option>`
+    + (k && k !== "-" && !NOME_DADO[k] ? `<option value="${esc(k)}" selected>IA: ${esc(descreverReceita(k))}</option>` : "")
+    + DADOS.map(([kk, r]) => `<option value="${kk}"${kk === k ? " selected" : ""}>${esc(r)}${d.dados[kk] ? "" : " (vazio)"}</option>`).join("");
   const visiveis = campos.filter(c => mapa[c.id] !== "-" || origem[c.id] === "ia-nada");
   p.insertAdjacentHTML("beforebegin", `<div class="p-sec lig-t"><span>O que foi em cada campo</span><span>corrija e a Yuh aprende</span></div>`);
   const L = document.createElement("div"); L.className = "ligacoes";
@@ -241,8 +243,9 @@ async function ensinar(d, c, k){
   const u = ultimoPreenchimento; if (!u) return;
   u.mapa[c.id] = k; u.origem[c.id] = "pessoa";
   if (k != null) await banco.salvarMapa(u.site, { [assinatura(c)]: k });
-  if (k && k !== "-" && d.dados[k]){
-    const r = await chrome.scripting.executeScript({ target: { tabId: u.tab.id, frameIds: [c.frame] }, func: l => window.__yuh.preencher(l), args: [[{ id: c.idLocal, valor: d.dados[k].valor, situacao: d.dados[k].situacao }]] });
+  const x = valorDaReceita(k, d.dados);
+  if (x){
+    const r = await chrome.scripting.executeScript({ target: { tabId: u.tab.id, frameIds: [c.frame] }, func: l => window.__yuh.preencher(l), args: [[{ id: c.idLocal, valor: x.valor, situacao: x.situacao }]] });
     u.res[c.id] = { ...(r[0]?.result?.[0] || {}), id: c.idLocal };
   }
   aviso(k == null ? "Ok." : "Aprendido para este site.");
