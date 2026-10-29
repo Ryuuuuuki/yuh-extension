@@ -25,6 +25,7 @@ Chrome MV3, painel lateral (`painel.html/js/css`), sem build. Lê documento → 
 O painel aceita `?aba=<tabId>` só para os testes (no uso real ele pega a aba ativa).
 
 ## Próximas etapas
-- Publicar o carteiro (`carteiro/worker.js`) na Cloudflare do Iuri e pôr o endereço em `CARTEIRO_PADRAO` (lib/celular.js).
+- Carteiro publicado (out/2026): worker `yuh-carteiro` em https://yuh-carteiro.iuripsiqueira.workers.dev, KV `yuh-caixa` ligado como `CAIXA` (conta Cloudflare do Iuri). Para atualizar: Cloudflare → Workers → yuh-carteiro → Edit code → colar `carteiro/worker.js` → Deploy.
+- Testar celular de verdade (Android e iPhone).
 - QR Code da CNH digital/CIN; leitura de vários documentos por pessoa (comprador/vendedor).
 - Testar em sites reais do cartório (o Iuri vai dizendo quais).
