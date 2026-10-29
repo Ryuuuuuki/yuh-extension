@@ -155,7 +155,9 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
     const os = require("os"), { spawn } = require("child_process");
     const dados = fs.mkdtempSync(path.join(os.tmpdir(), "yuh-dados-"));
     fs.writeFileSync(path.join(dados, "ponte.json"), JSON.stringify([{ id: "t1", nome: "RG Carla (teste)", tipo: "pdf", arquivos: [path.join(__dirname, "doc.pdf")], paginas: 2, quando: new Date().toISOString() }]));
-    const yuh = spawn(process.env.YUH_BIN, ["-addr", "127.0.0.1:8799"], { env: { ...process.env, YUH_DADOS: dados, YUH_SEM_ATUALIZACAO: "1" }, stdio: "ignore" });
+    // scanner falso (opcional: FAKE_BIN + FAKE_DIR = pasta do app, por causa das imagens de teste)
+    const fake = process.env.FAKE_BIN ? spawn(process.env.FAKE_BIN, ["-addr", "127.0.0.1:9443"], { cwd: process.env.FAKE_DIR, stdio: "ignore" }) : null;
+    const yuh = spawn(process.env.YUH_BIN, ["-addr", "127.0.0.1:8799", ...(fake ? ["-ip", "127.0.0.1:9443"] : [])], { env: { ...process.env, YUH_DADOS: dados, YUH_SEM_ATUALIZACAO: "1", YUH_TOKEN: "teste" }, stdio: "ignore" });
     try {
       await new Promise(r => setTimeout(r, 1500));
       // um site comum NÃO pode ler a ponte
@@ -172,7 +174,21 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
       await ext.waitForSelector(".campo input", { timeout: 30000 });
       const fpc = await ext.$$eval(".campo", cs => Object.fromEntries(cs.map(c => [c.dataset.k, c.querySelector("input").value])));
       confere("ponte: importou e leu (2 páginas)", azure === 2 && fpc.nome === "CARLA MENDES ROCHA", `leituras ${azure}`);
-    } finally { yuh.kill(); }
+      if (fake){
+        // digitaliza no Yuh Scanner (janela de verdade) e importa SEM salvar
+        const ui = await ctx.newPage(); await ui.goto("http://127.0.0.1:8799/k/teste/"); await ui.waitForTimeout(1500);
+        await ui.click("#bDigitalizar");
+        await ui.waitForFunction(() => document.querySelectorAll(".mini:not(.chegando)").length === 1, null, { timeout: 20000 });
+        azure = 0;
+        await ext.goto(ext.url().replace(/#.*$/, "")); await ext.click("#impYuh");
+        await ext.waitForSelector("#listaPc .doc .origem >> text=na tela", { timeout: 25000 });
+        confere("grid: aparece o que está na tela (sem salvar)", /1 pág\. · na tela agora/.test(await ext.textContent("#listaPc")));
+        await ext.click("#listaPc .doc >> nth=0");
+        await ext.waitForSelector(".campo input", { timeout: 30000 });
+        confere("grid: importou e leu a página da tela", azure === 1, `leituras ${azure}`);
+        await ui.close();
+      }
+    } finally { yuh.kill(); fake?.kill(); }
   }
   confere("nenhum site foi enviado", !(await pg.evaluate(() => window.enviado)));
   confere("sem erros no painel", erros.length === 0, erros.join(" | "));

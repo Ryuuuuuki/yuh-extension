@@ -2,7 +2,7 @@
 import * as banco from "./lib/banco.js";
 import { prepararFoto, lerFoto } from "./lib/azure.js";
 import { paginasDoPdf, MAX_PAGINAS } from "./lib/pdf.js";
-import { yuhAberto, listarDoPc, baixarDoPc } from "./lib/yuhpc.js";
+import { yuhAberto, listarDoPc, baixarDoPc, gradeAtual, baixarGrade } from "./lib/yuhpc.js";
 import { montarFicha, tituloDoc, completar, valorDaReceita, descreverReceita, DADOS, NOME_DADO } from "./lib/ficha.js";
 import { assinatura, chaveDoSite, mapearPorDicionario } from "./lib/campos.js";
 import { mapearComIA, temIA } from "./lib/gemini.js";
@@ -67,7 +67,7 @@ async function atualizarChipPc(){
 async function importarDoYuh(){
   tela = "yuh";
   const c = C(); c.innerHTML = "";
-  c.insertAdjacentHTML("beforeend", `<button class="voltar" id="vv">‹ Voltar</button><div class="p-sec"><span>Últimos documentos salvos no Yuh Scanner deste PC</span></div><div id="listaPc" class="campos"><div class="lendo"><img class="kuru" src="${KURU}" alt=""><span>Procurando o Yuh Scanner…</span></div></div>`);
+  c.insertAdjacentHTML("beforeend", `<button class="voltar" id="vv">‹ Voltar</button><div class="p-sec"><span>Yuh Scanner deste PC</span></div><div id="listaPc" class="campos"><div class="lendo"><img class="kuru" src="${KURU}" alt=""><span>Procurando o Yuh Scanner…</span></div></div>`);
   $("vv").onclick = () => desenharLista();
   let docs;
   try { docs = await listarDoPc(); }
@@ -75,8 +75,25 @@ async function importarDoYuh(){
     $("listaPc").innerHTML = `<div class="vazio-p">Não encontrei o Yuh Scanner aberto neste PC.<br>Abra o Yuh Scanner (versão 0.8 ou mais nova) e tente de novo.</div><button class="btn leve" id="tentar">Tentar de novo</button>`;
     $("tentar").onclick = importarDoYuh; return;
   }
-  const L = $("listaPc"); L.innerHTML = "";
-  if (!docs.length){ L.innerHTML = `<div class="vazio-p">Nada salvo no Yuh Scanner nas últimas 24 horas.<br>Digitalize, clique em <b>Salvar</b> lá e volte aqui.</div>`; return; }
+  const L = $("listaPc"); L.innerHTML = `<div class="lendo" id="lendoGrade"><img class="kuru" src="${KURU}" alt=""><span>Pegando o que está na tela do Yuh Scanner…</span></div>`;
+  // 1º: o que está no grid agora (mesmo sem salvar)
+  const g = await gradeAtual();
+  $("lendoGrade")?.remove();
+  if (g && g.paginas > 0){
+    const b = document.createElement("button"); b.className = "doc";
+    b.innerHTML = `<img alt=""><span class="inf"><b></b><small></small></span><span class="origem">na tela</span>`;
+    b.querySelector("b").textContent = g.nome || "Na tela do Yuh Scanner agora";
+    b.querySelector("small").textContent = `${g.paginas} pág. · na tela agora, sem salvar`;
+    b.onclick = async () => {
+      b.disabled = true;
+      try { lerArquivos(await baixarGrade(g, 4), "🖥 PC"); }
+      catch (e) { b.disabled = false; aviso(e.message || String(e)); }
+    };
+    L.append(b);
+    baixarGrade(g, 1).then(([f]) => { if (f) b.querySelector("img").src = URL.createObjectURL(f); }).catch(() => {});
+  }
+  if (docs.length) L.insertAdjacentHTML("beforeend", `<div class="p-sec"><span>Salvos nas últimas 24 h</span></div>`);
+  if (!docs.length && !(g && g.paginas)){ L.innerHTML = `<div class="vazio-p">O Yuh Scanner está aberto, mas não tem nada na tela nem salvo nas últimas 24 horas.<br>Digitalize lá e volte aqui.</div>`; return; }
   for (const d of docs){
     const b = document.createElement("button"); b.className = "doc";
     const quando = new Date(d.quando);
