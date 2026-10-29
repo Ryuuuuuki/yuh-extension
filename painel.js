@@ -2,6 +2,7 @@
 import * as banco from "./lib/banco.js";
 import { prepararFoto, lerFoto } from "./lib/azure.js";
 import { paginasDoPdf, MAX_PAGINAS } from "./lib/pdf.js";
+import { minhaCaixa, celulares, desconectarCelular, textoDoQr, abrirPareamento, fecharPareamento, pareamentoAberto, olharCaixa, carteiro } from "./lib/celular.js";
 import { yuhAberto, listarDoPc, baixarDoPc, gradeAtual, baixarGrade, recursosDoYuh } from "./lib/yuhpc.js";
 import { montarFicha, tituloDoc, completar, valorDaReceita, descreverReceita, DADOS, NOME_DADO } from "./lib/ficha.js";
 import { assinatura, chaveDoSite, mapearPorDicionario } from "./lib/campos.js";
@@ -54,7 +55,13 @@ async function desenharLista(novoId){
   await notaDoSite(c);
   $("impArq").onclick = () => $("arq").click();
   $("impYuh").onclick = () => importarDoYuh();
-  atualizarChipPc();
+  atualizarChipPc(); atualizarChipCel();
+}
+async function atualizarChipCel(){
+  const cs = await celulares(), ch = $("chipCel"); if (!ch) return;
+  ch.className = "chip" + (cs.length ? "" : " off");
+  ch.innerHTML = cs.length ? `<i></i>Celular: ${esc(cs[0].nome)}${cs.length > 1 ? ` +${cs.length - 1}` : ""}` : `<i></i>Nenhum celular <button id="chipCon">Conectar</button>`;
+  $("chipCon")?.addEventListener("click", () => abrirConectarCelular());
 }
 async function atualizarChipPc(){
   const ok = await yuhAberto(), ch = $("chipPc"); if (!ch) return;
@@ -127,34 +134,41 @@ async function notaDoSite(c){
 
 // ================= importar e ler =================
 $("arq").onchange = () => { const fs = [...$("arq").files]; $("arq").value = ""; if (fs.length) lerArquivos(fs, "🖥 PC"); };
+// lê os arquivos e guarda a ficha (sem mexer na tela); msg/miniatura são opcionais
+async function processarArquivos(fs, origem, { msg = () => {}, miniatura = () => {} } = {}){
+  const fotos = [];
+  for (const f of fs){
+    if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)){
+      msg("Abrindo o PDF…");
+      const { fotos: pgs, total } = await paginasDoPdf(f);
+      if (total > MAX_PAGINAS) aviso(`O PDF tem ${total} páginas; li só as ${MAX_PAGINAS} primeiras.`);
+      for (const pg of pgs){ const p = await prepararFoto(pg.blob); fotos.push(p); miniatura(p.miniatura); }
+    } else { const p = await prepararFoto(f); fotos.push(p); miniatura(p.miniatura); }
+  }
+  const textos = [], conf = new Map();
+  for (let i = 0; i < fotos.length; i++){
+    msg(fotos.length > 1 ? `Lendo a foto ${i + 1} de ${fotos.length}…` : "Lendo o documento…");
+    const r = await lerFoto(fotos[i].blob); textos.push(r.texto);
+    for (const [k, v] of r.conf) conf.set(k, Math.min(conf.get(k) ?? 1, v));
+  }
+  const ficha = montarFicha(textos.join("\n"), conf);
+  const doc = { id: crypto.randomUUID(), criado: Date.now(), tipo: ficha.tipo, dados: ficha.dados, imagens: fotos.map(f => f.miniatura), origem };
+  doc.titulo = tituloDoc(doc);
+  await banco.salvarDoc(doc);
+  return doc;
+}
 async function lerArquivos(fs, origem){
   const c = C(); c.innerHTML = ""; tela = "lendo";
   c.insertAdjacentHTML("beforeend", `<button class="voltar" id="vv">‹ Documentos</button><div class="ficha-img" id="fImg"></div><div class="lendo" id="fLendo"><img class="kuru" src="${KURU}" alt=""><span id="fMsg">Preparando ${fs.length > 1 ? "as fotos" : "a foto"}…</span></div>`);
   $("vv").onclick = () => desenharLista();
   try {
-    const fotos = [];
-    const mostrar = p => { fotos.push(p); const im = document.createElement("img"); im.src = p.miniatura; $("fImg").append(im); };
-    for (const f of fs){
-      if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)){
-        $("fMsg").textContent = "Abrindo o PDF…";
-        const { fotos: pgs, total } = await paginasDoPdf(f);
-        if (total > MAX_PAGINAS) aviso(`O PDF tem ${total} páginas; li só as ${MAX_PAGINAS} primeiras.`);
-        for (const pg of pgs) mostrar(await prepararFoto(pg.blob));
-      } else mostrar(await prepararFoto(f));
-    }
-    const textos = [], conf = new Map();
-    for (let i = 0; i < fotos.length; i++){
-      $("fMsg").textContent = fotos.length > 1 ? `Lendo a foto ${i + 1} de ${fotos.length}…` : "Lendo o documento…";
-      const r = await lerFoto(fotos[i].blob); textos.push(r.texto);
-      for (const [k, v] of r.conf) conf.set(k, Math.min(conf.get(k) ?? 1, v));
-    }
-    const ficha = montarFicha(textos.join("\n"), conf);
-    const doc = { id: crypto.randomUUID(), criado: Date.now(), tipo: ficha.tipo, dados: ficha.dados, imagens: fotos.map(f => f.miniatura), origem };
-    doc.titulo = tituloDoc(doc);
-    await banco.salvarDoc(doc);
+    const doc = await processarArquivos(fs, origem, {
+      msg: t => { if ($("fMsg")) $("fMsg").textContent = t; },
+      miniatura: src => { const im = document.createElement("img"); im.src = src; $("fImg")?.append(im); },
+    });
     abrirFicha(doc.id);
   } catch (e) {
-    $("fLendo").outerHTML = `<div class="erro">${esc(e.message || e)}</div>`;
+    if ($("fLendo")) $("fLendo").outerHTML = `<div class="erro">${esc(e.message || e)}</div>`;
   }
 }
 
@@ -333,6 +347,77 @@ async function ensinar(d, c, k){
   mostrarResultado(d, "");
 }
 
+// ================= conectar celular =================
+let qrTimer = null;
+async function abrirConectarCelular(){
+  tela = "par"; clearInterval(qrTimer);
+  const c = C(); c.innerHTML = "";
+  const cfg = await banco.config();
+  c.insertAdjacentHTML("beforeend", `<button class="voltar" id="vv">‹ Voltar</button><div class="pareamento" id="parBox"><b style="font-size:16px">Conectar um celular</b></div>
+    <div class="p-sec"><span>Celulares conectados a este navegador</span></div><div class="pcs" id="listaCel"></div>`);
+  $("vv").onclick = () => { fecharPareamento(); clearInterval(qrTimer); desenharLista(); };
+  desenharCelulares();
+  if (!(await carteiro())){
+    $("parBox").insertAdjacentHTML("beforeend", `<div class="erro">Falta o endereço do carteiro (⚙ → Celular).</div>`); return;
+  }
+  const texto = await textoDoQr(cfg.nomePc || "Chrome deste PC");
+  const q = qrcode(0, "M"); q.addData(texto); q.make();
+  $("parBox").insertAdjacentHTML("beforeend", `<img class="qr" id="qr" alt="QR Code para conectar" src="${q.createDataURL(6, 2)}">
+    <span class="tempo" id="tempo"></span>
+    <span style="color:var(--tinta-2);font-size:13px">No <b>Yuh Scanner Mobile</b>: menu ⋮ → <b>Conectar ao PC</b> e aponte a câmera para este código (ou use a câmera comum do celular). É uma vez só por celular.</span>`);
+  abrirPareamento(120);
+  let resta = 120;
+  const t = () => {
+    if (!$("tempo")) return clearInterval(qrTimer);
+    $("tempo").innerHTML = resta > 0 ? `Código válido por <b>${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, "0")}</b>` : `Código vencido · <button class="voltar" id="novoQr">gerar outro</button>`;
+    if (resta <= 0){ $("qr")?.classList.add("vencido"); $("novoQr")?.addEventListener("click", abrirConectarCelular); clearInterval(qrTimer); fecharPareamento(); }
+  };
+  t(); qrTimer = setInterval(() => { resta--; t(); }, 1000);
+  olharJa();
+}
+async function desenharCelulares(){
+  const L = $("listaCel"); if (!L) return;
+  const cs = await celulares();
+  L.innerHTML = cs.length ? "" : `<div class="vazio-p">Nenhum ainda.</div>`;
+  for (const x of cs){
+    const r = document.createElement("div"); r.className = "pc-item";
+    r.innerHTML = `<span style="flex:1"><b></b><small>conectado em ${new Date(x.quando).toLocaleDateString("pt-BR")}</small></span><button class="voltar" style="align-self:center;color:var(--carimbo)">Desconectar</button>`;
+    r.querySelector("b").textContent = x.nome;
+    r.querySelector("button").onclick = async () => { await desconectarCelular(x.id); aviso(`${x.nome} desconectado.`); desenharCelulares(); atualizarChipCel(); };
+    L.append(r);
+  }
+}
+$("bCel").onclick = () => tela === "par" ? (fecharPareamento(), desenharLista()) : abrirConectarCelular();
+
+// olha a caixa do carteiro: rápido enquanto o QR está na tela, a cada 5 s se há celular conectado
+let olhando = false, filaCel = Promise.resolve();
+async function olharJa(){
+  if (olhando) return; olhando = true;
+  try {
+    for (const ev of await olharCaixa()){
+      if (ev.tipo === "par" && $("parBox")){
+        clearInterval(qrTimer);
+        $("parBox").innerHTML = `<b style="font-size:16px">${esc(ev.nome)} quer se conectar</b>
+          <span style="color:var(--tinta-2);font-size:13px">Confira se o celular mostra o mesmo código:</span>
+          <div class="codigo">${[...ev.codigo].map(d => `<span>${d}</span>`).join("")}</div>
+          <div class="lendo" style="width:100%"><img class="kuru" src="${KURU}" alt=""><span>Esperando você confirmar no celular…</span></div>`;
+      } else if (ev.tipo === "conectado"){
+        if ($("parBox")) $("parBox").innerHTML = `<div class="resultado" style="width:100%"><b>${esc(ev.nome)} conectado ✓</b><span>Tudo que ele mandar com “Levar para o formulário no PC” chega aqui.</span></div>`;
+        desenharCelulares(); atualizarChipCel(); aviso(`${ev.nome} conectado.`);
+      } else if (ev.tipo === "desconectou"){ atualizarChipCel(); desenharCelulares(); }
+      else if (ev.tipo === "doc") receberDoCelular(ev);
+    }
+  } catch {} finally { olhando = false; }
+}
+function receberDoCelular(ev){
+  const arqs = ev.imagens.map((src, i) => { const [cab, b] = src.split(","); const bin = atob(b); const u8 = new Uint8Array(bin.length); for (let j = 0; j < bin.length; j++) u8[j] = bin.charCodeAt(j); return new File([u8], `${ev.docNome}_${i + 1}.jpg`, { type: /png/.test(cab) ? "image/png" : "image/jpeg" }); });
+  if (tela === "lista" || tela === "yuh" || tela === "par"){ lerArquivos(arqs, "📱 celular"); return; }
+  // ocupado numa ficha ou preenchendo: lê por trás e avisa
+  aviso(`Chegou do celular (${ev.nome}): ${ev.docNome}. Lendo…`);
+  filaCel = filaCel.then(() => processarArquivos(arqs, "📱 celular")).then(d => aviso(`Pronto: ${d.titulo} está em Documentos.`)).catch(e => aviso("Não consegui ler o que veio do celular: " + (e.message || e)));
+}
+setInterval(async () => { if (pareamentoAberto() || (await celulares()).length) olharJa(); }, 4000);
+
 // ================= configurações =================
 async function abrirConfig(){
   tela = "config";
@@ -349,6 +434,9 @@ async function abrirConfig(){
     <h3>IA para formulários novos · Gemini (grátis)</h3>
     <p>Crie a chave em <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> com sua conta Google. A IA recebe só os nomes dos campos dos sites, nunca dados de clientes.</p>
     <div class="campo"><label>Chave do Gemini ${cfg.geminiChave ? '<span class="ok-txt">✓ guardada</span>' : ""}</label><input id="cGemini" type="password" placeholder="${cfg.geminiChave ? "(deixe em branco para manter)" : "cole a chave do Google AI Studio"}"></div>
+    <h3>Celular · Yuh Scanner Mobile</h3>
+    <div class="campo"><label>Nome deste computador (aparece no celular)</label><input id="cNomePc" value="${esc(cfg.nomePc || "")}" placeholder="ex.: PC do balcão"></div>
+    <div class="campo"><label>Endereço do carteiro (Cloudflare)</label><input id="cCarteiro" value="${esc(cfg.carteiro || "")}" placeholder="https://yuh-carteiro.….workers.dev"></div>
     <button class="btn principal" id="cSalvar">Salvar</button>
 
     <h3>Privacidade</h3>
@@ -364,7 +452,9 @@ async function abrirConfig(){
     if (ponto && !/^https:\/\/[\w.-]+\.(cognitiveservices\.azure\.com|api\.cognitive\.microsoft\.com)$/.test(ponto)) return aviso("O ponto de extremidade não parece certo (termina com cognitiveservices.azure.com).");
     if (chave && !/^\w{20,}$/.test(chave)) return aviso("A chave do Azure não parece certa.");
     if (gem && !/^[\w.\-]{20,}$/.test(gem)) return aviso("A chave do Gemini não parece certa (copie ela inteira, sem espaços).");
-    const novo = { azurePonto: ponto }; if (chave) novo.azureChave = chave; if (gem) novo.geminiChave = gem;
+    const cart = $("cCarteiro").value.trim().replace(/\/+$/, "");
+    if (cart && !/^(https:\/\/[\w.-]+|http:\/\/(127\.0\.0\.1|localhost)(:\d+)?)(\/[\w.-]*)*$/.test(cart)) return aviso("O endereço do carteiro começa com https://");
+    const novo = { azurePonto: ponto, nomePc: $("cNomePc").value.trim().slice(0, 40), carteiro: cart }; if (chave) novo.azureChave = chave; if (gem) novo.geminiChave = gem;
     await banco.salvarConfig(novo); aviso("Salvo."); abrirConfig();
   };
   $("cApagarDocs").onclick = async () => { await banco.apagarTodosDocs(); await limparMarcas(); aviso("Documentos apagados."); };
