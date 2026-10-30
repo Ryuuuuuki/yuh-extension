@@ -1,0 +1,12 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Passo (legenda de baixo)</title><link rel="stylesheet" href="comum.css">
+<!-- Fundo transparente: vai POR CIMA da gravação de tela. ?n=3&texto=Clique em …&dica=… -->
+<style>
+.l{position:absolute;left:80px;bottom:80px;display:flex;align-items:center;gap:26px;background:rgba(27,34,44,.94);border:2px solid var(--linha);border-radius:30px;padding:24px 40px 24px 24px;max-width:1500px;box-shadow:0 20px 60px rgba(0,0,0,.45);animation:sobe .55s var(--entra) both}
+.n{flex:none;width:84px;height:84px;border-radius:24px;background:var(--caneta);display:grid;place-items:center;font-size:46px;font-weight:700;color:#fff}
+.t{display:flex;flex-direction:column;gap:6px}
+.t b{font-size:44px;line-height:1.2}
+.t span{font-size:30px;color:var(--tinta-2)}
+.t span:empty{display:none}
+</style></head><body>
+<div class="l"><div class="n" data-p="n">1</div><div class="t"><b data-p="texto">Ligue o Modo do desenvolvedor</b><span data-p="dica"></span></div></div>
+<script src="params.js"></script><script>window.DURACAO = 4;</script></body></html>

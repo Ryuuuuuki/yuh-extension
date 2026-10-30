@@ -1,0 +1,40 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Yuh — material do vídeo (prévia)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;font-family:system-ui,sans-serif;background:#11161d;color:#e6ebf1;padding:24px}
+h1{font-size:22px;margin:0 0 4px} p{color:#9aa7b6;margin:0 0 20px}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:20px}
+.c{background:#1b222c;border:1px solid #384455;border-radius:14px;overflow:hidden}
+.q{position:relative;width:100%;aspect-ratio:16/9;background:repeating-conic-gradient(#3a4250 0 25%,#2c333e 0 50%) 0 0/24px 24px;overflow:hidden}
+.q iframe{position:absolute;left:0;top:0;width:1920px;height:1080px;border:0;transform-origin:0 0}
+.r{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;font-size:14px}
+.r code{color:#7fa2ff;font-size:12px;word-break:break-all}
+button{background:#1f4fd1;color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer}
+</style></head><body>
+<h1>Material do vídeo da Yuh</h1><p>Cada cena roda sozinha. O xadrez = fundo transparente (vai por cima da gravação de tela). "De novo" repete a animação.</p>
+<div class="g" id="g"></div>
+<script>
+const cenas = [
+  ["abertura.html", "Abertura"],
+  ["capitulo.html?n=1&titulo=Instalar&sub=Uma vez só, em cada computador", "Capítulo 1"],
+  ["capitulo.html?n=2&titulo=Usar no dia a dia&sub=Ler um documento e preencher o site", "Capítulo 2"],
+  ["capitulo.html?n=3&titulo=Celular&sub=Conectar e mandar documentos", "Capítulo 3"],
+  ["passo.html?n=4&texto=Ligue o Modo do desenvolvedor&dica=Canto de cima, à direita", "Legenda de passo (transparente)"],
+  ["destaque.html?x=1650&y=110&w=320&h=70&texto=Modo do desenvolvedor", "Destaque (transparente)"],
+  ["aviso.html?tipo=cuidado&titulo=Não mostre a senha&texto=Ela vai separada, pelo WhatsApp.", "Aviso: cuidado"],
+  ["aviso.html?tipo=ok&titulo=A Yuh nunca envia&texto=Quem confere e clica em Enviar é sempre você.", "Aviso: ok"],
+  ["fluxo-documento.html", "Como funciona: documento → site"],
+  ["fluxo-celular.html", "Celular → PC, trancado"],
+  ["encerramento.html", "Encerramento"],
+];
+const g = document.getElementById("g");
+for (const [u, t] of cenas){
+  const c = document.createElement("div"); c.className = "c";
+  c.innerHTML = `<div class="q"><iframe src="cenas/${encodeURI(u)}"></iframe></div><div class="r"><div><b></b><br><code></code></div><button>De novo</button></div>`;
+  c.querySelector("b").textContent = t; c.querySelector("code").textContent = "cenas/" + u;
+  c.querySelector("button").onclick = () => c.querySelector("iframe").contentWindow.location.reload();
+  g.append(c);
+}
+const ajusta = () => document.querySelectorAll(".q").forEach(q => q.querySelector("iframe").style.transform = `scale(${q.clientWidth / 1920})`);
+addEventListener("resize", ajusta); ajusta();
+</script></body></html>

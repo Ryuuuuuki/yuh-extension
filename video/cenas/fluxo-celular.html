@@ -1,0 +1,26 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Celular → PC (trancado)</title><link rel="stylesheet" href="comum.css">
+<!-- Cena cheia (~6 s). -->
+<style>
+.palco{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:40px}
+.cel{width:300px;height:600px;border-radius:52px;border:12px solid #0d1117;background:var(--painel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;animation:sobe .6s var(--entra) both}
+.cel .folha{width:180px;height:240px;border-radius:12px;background:#fff}
+.cel span{font-size:26px;color:var(--tinta-2)}
+.pc{width:620px;height:420px;border-radius:28px;border:12px solid #0d1117;background:var(--painel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;animation:sobe .6s .2s var(--entra) both}
+.pc .codigo{display:flex;gap:16px}
+.pc .codigo b{width:84px;height:104px;border-radius:20px;border:4px solid var(--caneta-clara);display:grid;place-items:center;font-size:56px;color:var(--caneta-clara)}
+.pc span{font-size:28px;color:var(--tinta-2)}
+.meio{position:relative;width:340px;height:100px}
+.trilho{position:absolute;left:0;right:0;top:46px;height:8px;border-radius:4px;background:repeating-linear-gradient(90deg,var(--linha) 0 18px,transparent 18px 32px)}
+.pacote{position:absolute;left:0;top:5px;width:90px;border-radius:24px;background:var(--caneta);display:grid;place-items:center;font-size:48px;box-shadow:0 14px 40px rgba(31,79,209,.5);animation:viaja 1.8s 1.6s var(--entra) both}
+@keyframes viaja{0%{opacity:0;transform:translateX(0)}15%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translateX(250px)}}
+.pacote{height:90px}
+.ok{position:absolute;bottom:90px;left:0;right:0;text-align:center;font-size:40px;animation:sobe .5s 3.6s var(--entra) both}
+.ok b{color:var(--livre-claro)}
+</style></head><body class="cheio">
+<div class="palco">
+  <div class="cel"><div class="folha"></div><span>Yuh Scanner Mobile</span></div>
+  <div class="meio"><div class="trilho"></div><div class="pacote">🔒</div></div>
+  <div class="pc"><span>Mesmo código nos dois</span><div class="codigo"><b>4</b><b>8</b><b>1</b><b>7</b></div><span>Yuh Extension no PC</span></div>
+</div>
+<p class="ok"><b>Trancado:</b> só o seu computador consegue abrir. Some em 24 h.</p>
+<script src="params.js"></script><script>window.DURACAO = 6;</script></body></html>

@@ -1,0 +1,23 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Destaque (círculo + etiqueta)</title><link rel="stylesheet" href="comum.css">
+<!-- Fundo transparente. Marca um ponto da gravação: ?x=1500&y=120&w=260&h=70&texto=Modo do desenvolvedor&lado=baixo
+     x,y = centro do que destacar (em pixels do quadro 1920×1080); w,h = tamanho; lado = cima|baixo|esquerda|direita -->
+<style>
+.anel{position:absolute;border:6px solid var(--caneta-clara);border-radius:22px;animation:cresce .45s var(--entra) both,pulsa 1.6s .5s 3}
+.etq{position:absolute;background:var(--caneta);color:#fff;font-size:36px;font-weight:700;padding:14px 26px;border-radius:18px;white-space:nowrap;box-shadow:0 14px 40px rgba(0,0,0,.4);animation:sobe .45s .2s var(--entra) both}
+.etq:empty{display:none}
+</style></head><body>
+<div class="anel" id="anel"></div><div class="etq" id="etq" data-p="texto">Clique aqui</div>
+<script src="params.js"></script><script>
+window.DURACAO = 3;
+const x = +(P("x") || 960), y = +(P("y") || 540), w = +(P("w") || 240), h = +(P("h") || 80), lado = P("lado") || "baixo";
+const a = document.getElementById("anel"), e = document.getElementById("etq");
+Object.assign(a.style, { left: x - w / 2 + "px", top: y - h / 2 + "px", width: w + "px", height: h + "px" });
+requestAnimationFrame(() => {
+  const ew = e.offsetWidth, eh = e.offsetHeight, m = 28;
+  let L = x - ew / 2, T = y + h / 2 + m;
+  if (lado === "cima") T = y - h / 2 - m - eh;
+  if (lado === "esquerda"){ L = x - w / 2 - m - ew; T = y - eh / 2; }
+  if (lado === "direita"){ L = x + w / 2 + m; T = y - eh / 2; }
+  e.style.left = Math.max(20, Math.min(1900 - ew, L)) + "px"; e.style.top = Math.max(20, Math.min(1060 - eh, T)) + "px";
+});
+</script></body></html>

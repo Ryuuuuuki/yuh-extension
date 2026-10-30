@@ -1,0 +1,22 @@
+/* Yuh — material do vídeo. Quadro 1920×1080. Mesmas cores e fonte dos apps. */
+@font-face{font-family:"Atkinson Hyperlegible";font-weight:400;src:url(../../fontes/atkinson-hyperlegible-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Atkinson Hyperlegible";font-weight:700;src:url(../../fontes/atkinson-hyperlegible-latin-700-normal.woff2) format("woff2")}
+:root{
+  --mesa:#1B222C; --painel:#242D39; --papel:#F7F9FB; --tinta:#E6EBF1; --tinta-2:#9AA7B6; --linha:#384455;
+  --caneta:#1F4FD1; --caneta-clara:#7FA2FF; --livre:#1E8A4C; --livre-claro:#4CC283; --ocupado:#E3A948; --carimbo:#FF7A6E;
+  --fonte:"Atkinson Hyperlegible",system-ui,sans-serif;
+  --entra:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden}
+body{font-family:var(--fonte);color:var(--tinta);background:transparent}
+body.cheio{background:radial-gradient(ellipse at 30% 20%,#26324a 0%,var(--mesa) 60%)}
+/* animações base (o render.cjs controla o tempo; no navegador elas rodam sozinhas) */
+@keyframes sobe{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
+@keyframes some{to{opacity:0}}
+@keyframes aparece{from{opacity:0}to{opacity:1}}
+@keyframes cresce{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+@keyframes da-esquerda{from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:none}}
+@keyframes pulsa{0%,100%{box-shadow:0 0 0 0 rgba(127,162,255,.55)}50%{box-shadow:0 0 0 22px rgba(127,162,255,0)}}
+.marca{display:inline-flex;align-items:center;gap:18px;font-weight:700}
+.marca img{width:64px;height:64px;border-radius:16px}

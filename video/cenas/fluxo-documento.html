@@ -1,0 +1,45 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Como funciona: documento → Yuh → site</title><link rel="stylesheet" href="comum.css">
+<!-- Cena cheia (~7 s). Dados de MENTIRA, nunca de cliente. -->
+<style>
+.palco{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:50px}
+.caixa{background:var(--painel);border:2px solid var(--linha);border-radius:32px;padding:34px;display:flex;flex-direction:column;gap:18px}
+.tit{font-size:30px;color:var(--tinta-2);font-weight:700;letter-spacing:2px;text-transform:uppercase}
+.doc{width:500px;animation:sobe .6s var(--entra) both}
+.rg{background:#e8efe6;border-radius:18px;padding:26px;color:#20302a;display:flex;flex-direction:column;gap:10px;font-size:24px}
+.rg .faixa{height:14px;border-radius:7px;background:#b9cdb4}
+.rg .linha{display:flex;gap:20px;align-items:flex-start}.rg .dados{display:flex;flex-direction:column;gap:8px;min-width:0}
+.rg .foto{flex:none;width:100px;height:130px;border-radius:10px;background:#c9d6c5}
+.rg b{font-size:26px}
+.seta{font-size:90px;color:var(--caneta-clara);animation:aparece .4s both}
+.s1{animation-delay:.9s} .s2{animation-delay:3.1s}
+.yuh{width:340px;align-items:center;text-align:center;animation:cresce .6s 1.2s var(--entra) both}
+.yuh img.i{width:110px;height:110px;border-radius:28px}
+.yuh .kuru{width:170px;border-radius:18px;background:#fff;padding:4px}
+.yuh p{font-size:30px}
+.form{width:540px;animation:sobe .6s 3.3s var(--entra) both}
+.campo{display:flex;flex-direction:column;gap:6px}
+.campo label{font-size:22px;color:var(--tinta-2)}
+.campo div{height:58px;border-radius:12px;background:#fff;color:#1E2A3A;font-size:26px;display:flex;align-items:center;padding:0 16px;border:4px solid transparent;overflow:hidden}
+.campo div span{opacity:0;animation:aparece .3s both}
+.v div{animation:verde .3s both} .a div{animation:amarelo .3s both}
+@keyframes verde{to{border-color:#4CC283;background:#effaf3}}
+@keyframes amarelo{to{border-color:#E3A948;background:#fdf6e6}}
+.f1 div,.f1 span{animation-delay:4.0s} .f2 div,.f2 span{animation-delay:4.3s} .f3 div,.f3 span{animation-delay:4.6s} .f4 div,.f4 span{animation-delay:4.9s}
+.legenda{position:absolute;bottom:70px;left:0;right:0;display:flex;justify-content:center;gap:60px;font-size:32px;animation:aparece .5s 5.4s both}
+.legenda i{display:inline-block;width:30px;height:30px;border-radius:8px;vertical-align:-4px;margin-right:12px}
+</style></head><body class="cheio">
+<div class="palco">
+  <div class="caixa doc"><span class="tit">Documento</span>
+    <div class="rg"><div class="faixa"></div><div class="linha"><div class="dados"><span>NOME</span><b>MARIA EXEMPLO SILVA</b><span>CPF</span><b>000.000.000-00</b><span>NATURALIDADE</span><b>SALVADOR - BA</b></div><div class="foto"></div></div></div></div>
+  <div class="seta s1">→</div>
+  <div class="caixa yuh"><img class="i" src="icone.png" alt=""><img class="kuru" src="../../img/kuru.gif" alt=""><p>A Yuh lê e monta a ficha</p></div>
+  <div class="seta s2">→</div>
+  <div class="caixa form"><span class="tit">Formulário do site</span>
+    <div class="campo v f1"><label>Nome completo</label><div><span>MARIA EXEMPLO SILVA</span></div></div>
+    <div class="campo v f2"><label>CPF</label><div><span>000.000.000-00</span></div></div>
+    <div class="campo a f3"><label>Naturalidade</label><div><span>SALVADOR</span></div></div>
+    <div class="campo v f4"><label>UF</label><div><span>BA</span></div></div>
+  </div>
+</div>
+<div class="legenda"><span><i style="background:#4CC283"></i>Certeza</span><span><i style="background:#E3A948"></i>Confira</span><span>Quem envia é sempre você</span></div>
+<script src="params.js"></script><script>window.DURACAO = 7;</script></body></html>
