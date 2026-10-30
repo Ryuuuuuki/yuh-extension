@@ -20,8 +20,10 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
   let sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent("serviceworker");
   const id = sw.url().split("/")[2];
   let azure = 0, gemini = 0;
-  await ctx.route("https://yuh-teste.cognitiveservices.azure.com/**", r => { const lines = azure++ % 2 ? VERSO : FRENTE; r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ readResult: { blocks: [{ lines }] } }) }); });
-  await ctx.route("https://generativelanguage.googleapis.com/**", r => {
+  await ctx.route("http://127.0.0.1:8799/v1/ler", r => { const lines = azure++ % 2 ? VERSO : FRENTE; r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ readResult: { blocks: [{ lines }] } }) }); });
+  let iaNoAr = false;   // começa "sem IA" (central da IA fora do ar)
+  await ctx.route("http://127.0.0.1:8799/v1/ia/**", r => {
+    if (!iaNoAr) return r.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { message: "fora do ar (teste)" } }) });
     gemini++;
     const pedido = JSON.parse(r.request().postData()).contents[0].parts[0].text;
     if (/CARLA|ROCHA|529\.982/.test(pedido)) falhas.push("DADO DE CLIENTE FOI PARA A IA");
@@ -40,9 +42,12 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
 
   // ---------- configurar e ler o documento ----------
   let { pg, ext } = await painelDe("portal", "portal.html");
-  const erros = []; ext.on("pageerror", e => erros.push(e.message)); ext.on("console", m => m.type() === "error" && !/ERR_CONNECTION_REFUSED/.test(m.text()) && erros.push(m.text())); // "Yuh Scanner fechado" é normal
-  await ext.click("#bConfig");
-  await ext.fill("#cPonto", "https://yuh-teste.cognitiveservices.azure.com/"); await ext.fill("#cChave", "a".repeat(32)); await ext.fill("#cCarteiro", "http://127.0.0.1:8799"); await ext.click("#cSalvar");   // central fora do ar: testa o caminho com chave própria
+  const erros = []; ext.on("pageerror", e => erros.push(e.message)); ext.on("console", m => m.type() === "error" && !/ERR_CONNECTION_REFUSED|status of 503/.test(m.text()) && erros.push(m.text())); // "Yuh Scanner fechado" é normal
+  await ext.evaluate(async () => { const { config } = await chrome.storage.local.get("config"); await chrome.storage.local.set({ config: { ...config, carteiro: "http://127.0.0.1:8799" } }); });   // central de mentira (rotas acima)
+  await ext.route("http://127.0.0.1:8799/v1/uso", r => r.fulfill({ status: 200, contentType: "application/json", body: '{"mes":"2026-10","leituras":3,"limite":4500}' }));
+  await ext.click("#bConfig"); await ext.waitForSelector("#cUso .ok-txt", { timeout: 5000 }).catch(() => {});
+  confere("⚙ mostra o contador da central", /3 de 4500/.test(await ext.textContent("#cUso").catch(() => "")));
+  confere("⚙ sem campos de chave (usa a central)", !(await ext.$("#cChave")) && !(await ext.$("#cGemini")));
   await ext.click("#vv");
   await ext.setInputFiles("#arq", [path.join(__dirname, "foto.jpg"), path.join(__dirname, "foto.jpg")]);
   await ext.waitForSelector(".campos", { timeout: 20000 });
@@ -118,7 +123,7 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
   let txt = (await preencherEm(ext)).replace(/\s+/g, " ");
   console.log("\n[estranho sem IA]", txt.slice(0, 220));
   confere("estranho sem IA: avisa que não entendeu", /não entendi/.test(txt));
-  await ext.evaluate(async () => { const { config } = await chrome.storage.local.get("config"); await chrome.storage.local.set({ config: { ...config, geminiChave: "AIza" + "x".repeat(30) } }); });
+  iaNoAr = true;
   await ext.click("#bPreencher"); await ext.waitForFunction(() => document.querySelector(".resultado") && !document.querySelector("#lendoIA") && !/Preenchendo|Entendendo/.test(document.querySelector("#bPreencher").textContent), null, { timeout: 20000 });
   txt = (await ext.textContent(".resultado")).replace(/\s+/g, " ");
   console.log("[estranho com IA]", txt.slice(0, 200));

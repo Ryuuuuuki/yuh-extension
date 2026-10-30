@@ -7,7 +7,7 @@ import { yuhAberto, listarDoPc, baixarDoPc, gradeAtual, baixarGrade, recursosDoY
 import { montarFicha, tituloDoc, completar, valorDaReceita, descreverReceita, DADOS, NOME_DADO } from "./lib/ficha.js";
 import { assinatura, chaveDoSite, mapearPorDicionario } from "./lib/campos.js";
 import { mapearComIA, temIA } from "./lib/gemini.js";
-import { temCentral } from "./lib/central.js";
+import { temCentral, central } from "./lib/central.js";
 
 const $ = id => document.getElementById(id);
 const C = () => $("corpo");
@@ -438,45 +438,59 @@ setInterval(async () => { if (pareamentoAberto() || (await celulares()).length) 
 // ================= configurações =================
 async function abrirConfig(){
   tela = "config";
-  const cfg = await banco.config(), n = await banco.leiturasDoMes(), sites = await banco.sitesConhecidos();
+  const cfg = await banco.config(), sites = await banco.sitesConhecidos(), comCentral = await temCentral();
   const c = C(); c.innerHTML = "";
-  c.insertAdjacentHTML("beforeend", `<button class="voltar" id="vv">‹ Voltar</button>
-  <div class="cfg">
+  // sem o código do cartório (cópia de teste/desenvolvimento): chaves próprias, como antes
+  const chaves = comCentral ? `
+    <h3>Leitura e IA</h3>
+    <p id="cUso">Usando a central do cartório…</p>` : `
     <h3>Leitura de documentos · Microsoft Azure</h3>
-    <p>No portal do Azure: recurso <b>yuh-leitura</b> → <b>Chaves e Ponto de extremidade</b>.</p>
+    <p>Esta cópia não tem o código do cartório: use chaves próprias.</p>
     <div class="campo"><label>Ponto de extremidade</label><input id="cPonto" placeholder="https://….cognitiveservices.azure.com/" value="${esc(cfg.azurePonto || "")}"></div>
     <div class="campo"><label>Chave 1 ${cfg.azureChave ? '<span class="ok-txt">✓ guardada</span>' : ""}</label><input id="cChave" type="password" placeholder="${cfg.azureChave ? "(deixe em branco para manter)" : "cole a CHAVE 1"}"></div>
-    <p>Este mês, neste PC: <b>${n}</b> leituras (trava em ${banco.LIMITE_MES}; o grátis vai até 5000).</p>
-
-    <h3>IA para formulários novos · Gemini (grátis)</h3>
-    <p>Crie a chave em <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> com sua conta Google. A IA recebe só os nomes dos campos dos sites, nunca dados de clientes.</p>
     <div class="campo"><label>Chave do Gemini ${cfg.geminiChave ? '<span class="ok-txt">✓ guardada</span>' : ""}</label><input id="cGemini" type="password" placeholder="${cfg.geminiChave ? "(deixe em branco para manter)" : "cole a chave do Google AI Studio"}"></div>
+    <div class="campo"><label>Endereço do carteiro (Cloudflare)</label><input id="cCarteiro" value="${esc(cfg.carteiro || "")}" placeholder="https://yuh-carteiro.….workers.dev"></div>`;
+  c.insertAdjacentHTML("beforeend", `<button class="voltar" id="vv">‹ Voltar</button>
+  <div class="cfg">${chaves}
     <h3>Celular · Yuh Scanner Mobile</h3>
     <div class="campo"><label>Nome deste computador (aparece no celular)</label><input id="cNomePc" value="${esc(cfg.nomePc || "")}" placeholder="ex.: PC do balcão"></div>
-    <div class="campo"><label>Endereço do carteiro (Cloudflare)</label><input id="cCarteiro" value="${esc(cfg.carteiro || "")}" placeholder="https://yuh-carteiro.….workers.dev"></div>
     <button class="btn principal" id="cSalvar">Salvar</button>
 
     <h3>Privacidade</h3>
-    <p>As chaves e os documentos ficam só neste Chrome. Os documentos somem sozinhos em 24 h.</p>
+    <p>Os documentos ficam só neste Chrome e somem sozinhos em 24 h.</p>
     <button class="btn leve" id="cApagarDocs">Apagar todos os documentos agora</button>
     <p>Sites que a Yuh já aprendeu: <b>${sites.length}</b></p>
     <button class="btn leve" id="cEsquecer"${sites.length ? "" : " disabled"}>Esquecer o que aprendeu dos sites</button>
     <p style="margin-top:8px">Yuh Extension ${chrome.runtime.getManifest().version}</p>
   </div>`);
   $("vv").onclick = () => desenharLista();
+  if (comCentral) central("/v1/uso", { metodo: "GET" }).then(r => r.json()).then(u => {
+    if (!$("cUso")) return;
+    $("cUso").innerHTML = u.erro ? `<span class="erro" style="display:block">${esc(u.erro)}</span>`
+      : `<span class="ok-txt">✓ Usando a central do cartório</span> · <b>${u.leituras}</b> de ${u.limite} leituras este mês (o cartório todo).`;
+  }).catch(e => { if ($("cUso")) $("cUso").textContent = e.message || "Não consegui falar com a central."; });
   $("cSalvar").onclick = async () => {
-    const ponto = $("cPonto").value.trim().replace(/\/+$/, ""), chave = $("cChave").value.trim(), gem = $("cGemini").value.trim();
-    if (ponto && !/^https:\/\/[\w.-]+\.(cognitiveservices\.azure\.com|api\.cognitive\.microsoft\.com)$/.test(ponto)) return aviso("O ponto de extremidade não parece certo (termina com cognitiveservices.azure.com).");
-    if (chave && !/^\w{20,}$/.test(chave)) return aviso("A chave do Azure não parece certa.");
-    if (gem && !/^[\w.\-]{20,}$/.test(gem)) return aviso("A chave do Gemini não parece certa (copie ela inteira, sem espaços).");
-    const cart = $("cCarteiro").value.trim().replace(/\/+$/, "");
-    if (cart && !/^(https:\/\/[\w.-]+|http:\/\/(127\.0\.0\.1|localhost)(:\d+)?)(\/[\w.-]*)*$/.test(cart)) return aviso("O endereço do carteiro começa com https://");
-    const novo = { azurePonto: ponto, nomePc: $("cNomePc").value.trim().slice(0, 40), carteiro: cart }; if (chave) novo.azureChave = chave; if (gem) novo.geminiChave = gem;
+    const novo = { nomePc: $("cNomePc").value.trim().slice(0, 40) };
+    if (!comCentral){
+      const ponto = $("cPonto").value.trim().replace(/\/+$/, ""), chave = $("cChave").value.trim(), gem = $("cGemini").value.trim();
+      if (ponto && !/^https:\/\/[\w.-]+\.(cognitiveservices\.azure\.com|api\.cognitive\.microsoft\.com)$/.test(ponto)) return aviso("O ponto de extremidade não parece certo (termina com cognitiveservices.azure.com).");
+      if (chave && !/^\w{20,}$/.test(chave)) return aviso("A chave do Azure não parece certa.");
+      if (gem && !/^[\w.\-]{20,}$/.test(gem)) return aviso("A chave do Gemini não parece certa (copie ela inteira, sem espaços).");
+      const cart = $("cCarteiro").value.trim().replace(/\/+$/, "");
+      if (cart && !/^(https:\/\/[\w.-]+|http:\/\/(127\.0\.0\.1|localhost)(:\d+)?)(\/[\w.-]*)*$/.test(cart)) return aviso("O endereço do carteiro começa com https://");
+      Object.assign(novo, { azurePonto: ponto, carteiro: cart }); if (chave) novo.azureChave = chave; if (gem) novo.geminiChave = gem;
+    }
     await banco.salvarConfig(novo); aviso("Salvo."); abrirConfig();
   };
   $("cApagarDocs").onclick = async () => { await banco.apagarTodosDocs(); await limparMarcas(); aviso("Documentos apagados."); };
   $("cEsquecer").onclick = async () => { await banco.esquecerMapas(); aviso("Pronto: a Yuh esqueceu os sites."); abrirConfig(); };
 }
+// com a central, chaves antigas guardadas neste PC não servem mais: apaga
+(async () => {
+  if (!(await temCentral())) return;
+  const cfg = await banco.config();
+  if (cfg.azureChave || cfg.geminiChave || cfg.azurePonto){ const { azureChave, geminiChave, azurePonto, ...resto } = cfg; await chrome.storage.local.set({ config: resto }); }
+})();
 $("bConfig").onclick = () => tela === "config" ? desenharLista() : abrirConfig();
 
 // troca de aba: a nota do site muda

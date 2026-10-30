@@ -21,7 +21,7 @@ const falhas = []; const confere = (n, ok, x = "") => { console.log((ok ? "  ok 
   const ctx = await chromium.launchPersistentContext("", { channel: "chromium", headless: true, args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`] });
   const sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent("serviceworker"); const id = sw.url().split("/")[2];
   let azure = 0;
-  await ctx.route("https://yuh-teste.cognitiveservices.azure.com/**", r => { azure++; r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ readResult: { blocks: [{ lines: [
+  await ctx.route("http://127.0.0.1:8793/v1/ler", r => { azure++; r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ readResult: { blocks: [{ lines: [
     { text: "CARTEIRA DE IDENTIDADE", boundingPolygon: [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 20 }, { x: 0, y: 20 }], words: [] },
     { text: "Nome / Name", boundingPolygon: [{ x: 0, y: 40 }, { x: 300, y: 40 }, { x: 300, y: 60 }, { x: 0, y: 60 }], words: [] },
     { text: "CARLA MENDES ROCHA", boundingPolygon: [{ x: 0, y: 70 }, { x: 300, y: 70 }, { x: 300, y: 90 }, { x: 0, y: 90 }], words: [] }] }] } }) }); });
