@@ -7,7 +7,9 @@ import { yuhAberto, listarDoPc, baixarDoPc, gradeAtual, baixarGrade, recursosDoY
 import { montarFicha, tituloDoc, completar, valorDaReceita, descreverReceita, DADOS, NOME_DADO } from "./lib/ficha.js";
 import { assinatura, chaveDoSite, mapearPorDicionario } from "./lib/campos.js";
 import { mapearComIA, temIA } from "./lib/gemini.js";
-import { temCentral, central } from "./lib/central.js";
+import { temCentral, central, guardarSenha } from "./lib/central.js";
+import { SENHA_MUDOU } from "./lib/azure.js";
+chrome.runtime.sendMessage("yuh-conferir-versao").catch(() => {});   // pasta atualizada pelo Yuh Scanner? recarrega
 
 const $ = id => document.getElementById(id);
 const C = () => $("corpo");
@@ -51,12 +53,26 @@ async function desenharLista(novoId){
     b.onclick = () => abrirFicha(d.id);
     c.append(b);
   }
-  const cfg = await banco.config();
-  if (!cfg.azurePonto && !(await temCentral())) c.insertAdjacentHTML("beforeend", `<div class="mapa">${ICO.info}<span><b>Falta configurar a leitura.</b> Toque na engrenagem ⚙ no topo e cole o endereço e a chave do Azure.</span></div>`);
+  if (!(await temCentral())) caixaDaSenha(c);
   await notaDoSite(c);
   $("impArq").onclick = () => $("arq").click();
   $("impYuh").onclick = () => importarDoYuh();
   atualizarChipPc(); atualizarChipCel();
+}
+// "Senha do cartório": digitada uma vez (o Iuri passa). Sem ela a Yuh não lê nem usa a IA.
+function caixaDaSenha(c){
+  c.insertAdjacentHTML("afterbegin", `<div class="senha-caixa" id="senhaCaixa">
+    <b>Senha do cartório</b>
+    <span>Só na primeira vez. Peça ao Iuri e cole aqui.</span>
+    <div class="senha-linha"><input id="senhaIn" type="password" autocomplete="off" placeholder="cole a senha"><button class="btn principal" id="senhaOk">Salvar</button></div>
+  </div>`);
+  const ok = async () => {
+    const b = $("senhaOk"); b.disabled = true; b.textContent = "Conferindo…";
+    try { await guardarSenha($("senhaIn").value); aviso("Senha guardada. Pode usar a Yuh!"); desenharLista(); }
+    catch (e) { aviso(e.message); b.disabled = false; b.textContent = "Salvar"; }
+  };
+  $("senhaOk").onclick = ok;
+  $("senhaIn").onkeydown = e => { if (e.key === "Enter") ok(); };
 }
 async function atualizarChipCel(){
   const cs = await celulares(), ch = $("chipCel"); if (!ch) return;
@@ -440,16 +456,9 @@ async function abrirConfig(){
   tela = "config";
   const cfg = await banco.config(), sites = await banco.sitesConhecidos(), comCentral = await temCentral();
   const c = C(); c.innerHTML = "";
-  // sem o código do cartório (cópia de teste/desenvolvimento): chaves próprias, como antes
-  const chaves = comCentral ? `
+  const chaves = `
     <h3>Leitura e IA</h3>
-    <p id="cUso">Usando a central do cartório…</p>` : `
-    <h3>Leitura de documentos · Microsoft Azure</h3>
-    <p>Esta cópia não tem o código do cartório: use chaves próprias.</p>
-    <div class="campo"><label>Ponto de extremidade</label><input id="cPonto" placeholder="https://….cognitiveservices.azure.com/" value="${esc(cfg.azurePonto || "")}"></div>
-    <div class="campo"><label>Chave 1 ${cfg.azureChave ? '<span class="ok-txt">✓ guardada</span>' : ""}</label><input id="cChave" type="password" placeholder="${cfg.azureChave ? "(deixe em branco para manter)" : "cole a CHAVE 1"}"></div>
-    <div class="campo"><label>Chave do Gemini ${cfg.geminiChave ? '<span class="ok-txt">✓ guardada</span>' : ""}</label><input id="cGemini" type="password" placeholder="${cfg.geminiChave ? "(deixe em branco para manter)" : "cole a chave do Google AI Studio"}"></div>
-    <div class="campo"><label>Endereço do carteiro (Cloudflare)</label><input id="cCarteiro" value="${esc(cfg.carteiro || "")}" placeholder="https://yuh-carteiro.….workers.dev"></div>`;
+    <p id="cUso">${comCentral ? "Usando a central do cartório…" : "Falta a senha do cartório: ela aparece na tela inicial da Yuh."}</p>`;
   c.insertAdjacentHTML("beforeend", `<button class="voltar" id="vv">‹ Voltar</button>
   <div class="cfg">${chaves}
     <h3>Celular · Yuh Scanner Mobile</h3>
@@ -464,22 +473,13 @@ async function abrirConfig(){
     <p style="margin-top:8px">Yuh Extension ${chrome.runtime.getManifest().version}</p>
   </div>`);
   $("vv").onclick = () => desenharLista();
-  if (comCentral) central("/v1/uso", { metodo: "GET" }).then(r => r.json()).then(u => {
+  if (comCentral) central("/v1/uso", { metodo: "GET" }).then(r => r.status === 401 ? { erro: SENHA_MUDOU } : r.json()).then(u => {
     if (!$("cUso")) return;
     $("cUso").innerHTML = u.erro ? `<span class="erro" style="display:block">${esc(u.erro)}</span>`
       : `<span class="ok-txt">✓ Usando a central do cartório</span> · <b>${u.leituras}</b> de ${u.limite} leituras este mês (o cartório todo).`;
   }).catch(e => { if ($("cUso")) $("cUso").textContent = e.message || "Não consegui falar com a central."; });
   $("cSalvar").onclick = async () => {
     const novo = { nomePc: $("cNomePc").value.trim().slice(0, 40) };
-    if (!comCentral){
-      const ponto = $("cPonto").value.trim().replace(/\/+$/, ""), chave = $("cChave").value.trim(), gem = $("cGemini").value.trim();
-      if (ponto && !/^https:\/\/[\w.-]+\.(cognitiveservices\.azure\.com|api\.cognitive\.microsoft\.com)$/.test(ponto)) return aviso("O ponto de extremidade não parece certo (termina com cognitiveservices.azure.com).");
-      if (chave && !/^\w{20,}$/.test(chave)) return aviso("A chave do Azure não parece certa.");
-      if (gem && !/^[\w.\-]{20,}$/.test(gem)) return aviso("A chave do Gemini não parece certa (copie ela inteira, sem espaços).");
-      const cart = $("cCarteiro").value.trim().replace(/\/+$/, "");
-      if (cart && !/^(https:\/\/[\w.-]+|http:\/\/(127\.0\.0\.1|localhost)(:\d+)?)(\/[\w.-]*)*$/.test(cart)) return aviso("O endereço do carteiro começa com https://");
-      Object.assign(novo, { azurePonto: ponto, carteiro: cart }); if (chave) novo.azureChave = chave; if (gem) novo.geminiChave = gem;
-    }
     await banco.salvarConfig(novo); aviso("Salvo."); abrirConfig();
   };
   $("cApagarDocs").onclick = async () => { await banco.apagarTodosDocs(); await limparMarcas(); aviso("Documentos apagados."); };

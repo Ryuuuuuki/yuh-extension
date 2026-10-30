@@ -27,6 +27,9 @@ const falhas = []; const confere = (n, ok, x = "") => { console.log((ok ? "  ok 
     r.writeHead(resp.status, Object.fromEntries(resp.headers)); r.end(Buffer.from(await resp.arrayBuffer()));
   }).listen(8794);
 
+  // sem o arquivo do zip do Iuri: a senha é digitada na caixinha (como os colegas fazem)
+  const fs = require("fs"), arqCod = path.join(EXT, "lib/codigo-cartorio.js"), guardado = arqCod + ".teste";
+  fs.renameSync(arqCod, guardado); process.on("exit", () => { try { fs.renameSync(guardado, arqCod); } catch {} });
   const ctx = await chromium.launchPersistentContext("", { channel: "chromium", headless: true, args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`] });
   const sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent("serviceworker"); const id = sw.url().split("/")[2];
   let direto = 0;
@@ -35,7 +38,11 @@ const falhas = []; const confere = (n, ok, x = "") => { console.log((ok ? "  ok 
   const erros = []; ext.on("pageerror", e => erros.push(e.message));
   await ext.evaluate(async () => chrome.storage.local.set({ config: { carteiro: "http://127.0.0.1:8794" } }));   // nenhuma chave
   await ext.reload(); await ext.waitForTimeout(500);
-  confere("sem aviso de 'falta configurar'", !/Falta configurar/.test(await ext.textContent("body")));
+  confere("1ª vez: pede a senha do cartório", !!(await ext.$("#senhaCaixa")));
+  await ext.fill("#senhaIn", "senha-errada-123"); await ext.click("#senhaOk"); await ext.waitForTimeout(600);
+  confere("senha errada: avisa e continua pedindo", /Senha errada/.test(await ext.textContent("body")) && !!(await ext.$("#senhaCaixa")));
+  await ext.fill("#senhaIn", CODIGO); await ext.click("#senhaOk"); await ext.waitForTimeout(800);
+  confere("senha certa: some a caixinha", !(await ext.$("#senhaCaixa")));
   await ext.setInputFiles("#arq", path.join(__dirname, "foto.jpg"));
   await ext.waitForSelector(".campo input", { timeout: 20000 });
   const nome = await ext.$eval('.campo[data-k="nome"] input', e => e.value).catch(() => "");
@@ -51,7 +58,9 @@ const falhas = []; const confere = (n, ok, x = "") => { console.log((ok ? "  ok 
   await ext.click("#vv").catch(() => {}); await ext.waitForTimeout(300);
   await ext.setInputFiles("#arq", path.join(__dirname, "foto.jpg"));
   await ext.waitForSelector(".erro", { timeout: 15000 });
-  confere("código errado: avisa para atualizar", /Atualize a Yuh Extension/.test(await ext.textContent(".erro")), await ext.textContent(".erro"));
+  confere("senha trocada pelo Iuri: avisa", /senha do cartório mudou/.test(await ext.textContent(".erro")), await ext.textContent(".erro"));
+  await ext.click("#vv").catch(() => {}); await ext.waitForTimeout(500);
+  confere("senha trocada: a caixinha volta", !!(await ext.$("#senhaCaixa")));
   confere("sem erros no painel", erros.length === 0, erros.join(" | "));
   console.log(falhas.length ? `\n${falhas.length} FALHA(S): ${falhas.join("; ")}` : "\nTUDO CERTO");
   await ctx.close(); srv.close(); process.exit(falhas.length ? 1 : 0);
