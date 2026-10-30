@@ -42,7 +42,7 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
   let { pg, ext } = await painelDe("portal", "portal.html");
   const erros = []; ext.on("pageerror", e => erros.push(e.message)); ext.on("console", m => m.type() === "error" && !/ERR_CONNECTION_REFUSED/.test(m.text()) && erros.push(m.text())); // "Yuh Scanner fechado" é normal
   await ext.click("#bConfig");
-  await ext.fill("#cPonto", "https://yuh-teste.cognitiveservices.azure.com/"); await ext.fill("#cChave", "a".repeat(32)); await ext.click("#cSalvar");
+  await ext.fill("#cPonto", "https://yuh-teste.cognitiveservices.azure.com/"); await ext.fill("#cChave", "a".repeat(32)); await ext.fill("#cCarteiro", "http://127.0.0.1:8799"); await ext.click("#cSalvar");   // central fora do ar: testa o caminho com chave própria
   await ext.click("#vv");
   await ext.setInputFiles("#arq", [path.join(__dirname, "foto.jpg"), path.join(__dirname, "foto.jpg")]);
   await ext.waitForSelector(".campos", { timeout: 20000 });
@@ -130,7 +130,7 @@ const falhas = []; const confere = (nome, ok, extra = "") => { console.log((ok ?
   confere("estranho: campos da IA em amarelo", /para conferir/.test(txt));
   // ensinar: trocar o que vai em "Ascendente paterno" para "Não preencher"
   const linha = ext.locator(".lig", { hasText: "Ascendente paterno" });
-  await linha.locator("select").selectOption("-");
+  await linha.locator("select").selectOption("-"); await ext.waitForTimeout(400);
   const mapas = await ext.evaluate(async () => (await chrome.storage.local.get("mapas")).mapas);
   confere("ensinar: guardou no mapa do site", JSON.stringify(mapas).includes('"-"'));
   // memória: recarrega o site e preenche de novo sem chamar a IA

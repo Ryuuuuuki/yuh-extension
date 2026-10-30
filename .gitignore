@@ -1,3 +1,4 @@
 testes/*.png
 *.zip
 node_modules/
+lib/codigo-cartorio.js

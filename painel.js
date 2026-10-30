@@ -7,6 +7,7 @@ import { yuhAberto, listarDoPc, baixarDoPc, gradeAtual, baixarGrade, recursosDoY
 import { montarFicha, tituloDoc, completar, valorDaReceita, descreverReceita, DADOS, NOME_DADO } from "./lib/ficha.js";
 import { assinatura, chaveDoSite, mapearPorDicionario } from "./lib/campos.js";
 import { mapearComIA, temIA } from "./lib/gemini.js";
+import { temCentral } from "./lib/central.js";
 
 const $ = id => document.getElementById(id);
 const C = () => $("corpo");
@@ -51,7 +52,7 @@ async function desenharLista(novoId){
     c.append(b);
   }
   const cfg = await banco.config();
-  if (!cfg.azurePonto) c.insertAdjacentHTML("beforeend", `<div class="mapa">${ICO.info}<span><b>Falta configurar a leitura.</b> Toque na engrenagem ⚙ no topo e cole o endereço e a chave do Azure.</span></div>`);
+  if (!cfg.azurePonto && !(await temCentral())) c.insertAdjacentHTML("beforeend", `<div class="mapa">${ICO.info}<span><b>Falta configurar a leitura.</b> Toque na engrenagem ⚙ no topo e cole o endereço e a chave do Azure.</span></div>`);
   await notaDoSite(c);
   $("impArq").onclick = () => $("arq").click();
   $("impYuh").onclick = () => importarDoYuh();
