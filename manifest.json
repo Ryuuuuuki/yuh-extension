@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Yuh Extension",
   "short_name": "Yuh",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Lê documentos digitalizados e preenche formulários de sites. Nunca envia nada sozinha: quem confere e envia é você.",
   "icons": { "16": "icones/icone-16.png", "32": "icones/icone-32.png", "48": "icones/icone-48.png", "128": "icones/icone-128.png" },
   "action": { "default_title": "Yuh Extension", "default_icon": { "16": "icones/icone-16.png", "32": "icones/icone-32.png" } },
