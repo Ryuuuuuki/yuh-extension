@@ -26,6 +26,7 @@ O painel aceita `?aba=<tabId>` só para os testes (no uso real ele pega a aba at
 
 ## Próximas etapas
 - Carteiro publicado (out/2026): worker `yuh-carteiro` em https://yuh-carteiro.iuripsiqueira.workers.dev, KV `yuh-caixa` ligado como `CAIXA` (conta Cloudflare do Iuri). Para atualizar: Cloudflare → Workers → yuh-carteiro → Edit code → colar `carteiro/worker.js` → Deploy.
+- Celular ≥1.3.0 manda sozinho, ao conectar, tudo que ainda não foi para este PC; o painel lê vários em fila (`receberVariosDoCelular`).
 - Testar celular de verdade (Android e iPhone).
 - QR Code da CNH digital/CIN; leitura de vários documentos por pessoa (comprador/vendedor).
 - Testar em sites reais do cartório (o Iuri vai dizendo quais).

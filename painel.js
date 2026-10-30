@@ -394,7 +394,9 @@ let olhando = false, filaCel = Promise.resolve();
 async function olharJa(){
   if (olhando) return; olhando = true;
   try {
-    for (const ev of await olharCaixa()){
+    const eventos = await olharCaixa();
+    const docsCel = eventos.filter(ev => ev.tipo === "doc");
+    for (const ev of eventos){
       if (ev.tipo === "par" && $("parBox")){
         clearInterval(qrTimer);
         $("parBox").innerHTML = `<b style="font-size:16px">${esc(ev.nome)} quer se conectar</b>
@@ -402,19 +404,33 @@ async function olharJa(){
           <div class="codigo">${[...ev.codigo].map(d => `<span>${d}</span>`).join("")}</div>
           <div class="lendo" style="width:100%"><img class="kuru" src="${KURU}" alt=""><span>Esperando você confirmar no celular…</span></div>`;
       } else if (ev.tipo === "conectado"){
-        if ($("parBox")) $("parBox").innerHTML = `<div class="resultado" style="width:100%"><b>${esc(ev.nome)} conectado ✓</b><span>Tudo que ele mandar com “Levar para o formulário no PC” chega aqui.</span></div>`;
+        if ($("parBox")) $("parBox").innerHTML = `<div class="resultado" style="width:100%"><b>${esc(ev.nome)} conectado ✓</b><span>Os documentos que estão no celular já vêm para cá. Depois, é só usar “Levar para o formulário no PC”.</span></div>`;
         desenharCelulares(); atualizarChipCel(); aviso(`${ev.nome} conectado.`);
       } else if (ev.tipo === "desconectou"){ atualizarChipCel(); desenharCelulares(); }
-      else if (ev.tipo === "doc") receberDoCelular(ev);
     }
+    if (docsCel.length === 1) receberDoCelular(docsCel[0]);
+    else if (docsCel.length > 1) receberVariosDoCelular(docsCel);
   } catch {} finally { olhando = false; }
 }
+function arquivosDoCelular(ev){
+  return ev.imagens.map((src, i) => { const [cab, b] = src.split(","); const bin = atob(b); const u8 = new Uint8Array(bin.length); for (let j = 0; j < bin.length; j++) u8[j] = bin.charCodeAt(j); return new File([u8], `${ev.docNome}_${i + 1}.jpg`, { type: /png/.test(cab) ? "image/png" : "image/jpeg" }); });
+}
 function receberDoCelular(ev){
-  const arqs = ev.imagens.map((src, i) => { const [cab, b] = src.split(","); const bin = atob(b); const u8 = new Uint8Array(bin.length); for (let j = 0; j < bin.length; j++) u8[j] = bin.charCodeAt(j); return new File([u8], `${ev.docNome}_${i + 1}.jpg`, { type: /png/.test(cab) ? "image/png" : "image/jpeg" }); });
+  const arqs = arquivosDoCelular(ev);
   if (tela === "lista" || tela === "yuh" || tela === "par"){ lerArquivos(arqs, "📱 celular"); return; }
   // ocupado numa ficha ou preenchendo: lê por trás e avisa
   aviso(`Chegou do celular (${ev.nome}): ${ev.docNome}. Lendo…`);
   filaCel = filaCel.then(() => processarArquivos(arqs, "📱 celular")).then(d => aviso(`Pronto: ${d.titulo} está em Documentos.`)).catch(e => aviso("Não consegui ler o que veio do celular: " + (e.message || e)));
+}
+// vários de uma vez (o celular manda tudo assim que conecta): lê um por um, por trás, e vai pondo na lista
+function receberVariosDoCelular(evs){
+  if (tela === "par" || tela === "yuh") desenharLista();
+  aviso(`Chegaram ${evs.length} documentos do celular. Lendo um por um…`);
+  evs.forEach((ev, i) => {
+    filaCel = filaCel.then(() => processarArquivos(arquivosDoCelular(ev), "📱 celular"))
+      .then(d => { if (tela === "lista") desenharLista(d.id); aviso(`Lido ${i + 1} de ${evs.length}: ${d.titulo}`); })
+      .catch(e => aviso(`Não consegui ler ${ev.docNome}: ` + (e.message || e)));
+  });
 }
 setInterval(async () => { if (pareamentoAberto() || (await celulares()).length) olharJa(); }, 4000);
 

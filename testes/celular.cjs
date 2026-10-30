@@ -39,6 +39,18 @@ const falhas = []; const confere = (n, ok, x = "") => { console.log((ok ? "  ok 
   const cel = await ctx.newPage({ ...devices["Pixel 7"] });
   await cel.setViewportSize({ width: 412, height: 860 });
   await cel.goto("http://localhost:8791/"); await cel.waitForTimeout(800);
+  // dois documentos já digitalizados no celular (devem ir sozinhos quando conectar)
+  await cel.evaluate(async () => {
+    const b = await import("./js/banco.js");
+    for (const [i, nome] of ["Doc A (teste)", "Doc B (teste)"].entries()){
+      const c = document.createElement("canvas"); c.width = 900; c.height = 600; const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, 900, 600); g.fillStyle = "#000"; g.font = "40px sans-serif"; g.fillText(nome, 60, 120);
+      const blob = await new Promise(r => c.toBlob(r, "image/jpeg", .9)); const pid = "pteste" + i;
+      await b.guardarFoto(pid, blob);
+      await b.salvarDoc({ id: "dteste" + i, nome, criado: Date.now(), paginas: [{ pid, cantos: [{ x: 0, y: 0 }, { x: 900, y: 0 }, { x: 900, y: 600 }, { x: 0, y: 600 }], filtro: "original", rot: 0 }] });
+    }
+  });
+  await cel.reload(); await cel.waitForTimeout(800);
+  azure = 0;
   await cel.evaluate(t => window.__yuhQr(t), textoQr);
   await cel.waitForSelector("#telaCodigo .codigo", { timeout: 10000 });
   const codCel = (await cel.textContent("#telaCodigo .codigo")).trim();
@@ -50,12 +62,24 @@ const falhas = []; const confere = (n, ok, x = "") => { console.log((ok ? "  ok 
   await ext.screenshot({ path: path.join(__dirname, "tela-ext-codigo.png") });
   await cel.click("#cIgual");
   await cel.waitForSelector("#cOk", { timeout: 10000 });
-  await ext.waitForFunction(() => /conectado ✓/.test(document.querySelector("#parBox")?.textContent || ""), null, { timeout: 10000 });
+  await ext.waitForFunction(() => /Android/.test(document.querySelector("#chipCel")?.textContent || ""), null, { timeout: 15000 });
   confere("extensão: conectado", true);
   confere("chip: nome do celular", /Celular: .*Android/.test(await ext.textContent("#chipCel")), await ext.textContent("#chipCel"));
+  // ---------- os 2 que já estavam no celular chegam sozinhos ----------
+  await cel.waitForFunction(() => /2 documentos enviados/.test(document.querySelector("#cEnvio")?.textContent || ""), null, { timeout: 20000 }).catch(() => {});
+  confere("celular: mandou os 2 ao conectar", /2 documentos enviados/.test(await cel.textContent("#cEnvio")), await cel.textContent("#cEnvio"));
+  await cel.screenshot({ path: path.join(__dirname, "tela-cel-conectado.png") });
+  await ext.waitForFunction(() => document.querySelectorAll(".doc").length >= 2, null, { timeout: 30000 }).catch(() => {});
+  confere("extensão: os 2 foram lidos e estão na lista", (await ext.$$(".doc")).length === 2 && azure === 2, `docs ${(await ext.$$(".doc")).length}, leituras ${azure}`);
+  await ext.screenshot({ path: path.join(__dirname, "tela-ext-varios.png") });
   await cel.click("#cOk");
+  // conectar de novo não manda de novo
+  const antesPac = pacotes.length;
+  await cel.evaluate(async () => { const p = await import("./js/ponte.js"); window.__x = p; });
+  confere("já enviados ficam marcados", await cel.evaluate(async () => { const p = window.__x; const pc = p.pcs()[0]; return p.jaEnviado(pc, { id: "dteste0", alterado: (await (await import("./js/banco.js")).listarDocs()).find(d => d.id === "dteste0").alterado }); }));
   // ---------- mandar um documento ----------
-  await ext.click("#vv");
+  if (await ext.$("#vv")) await ext.click("#vv");
+  await ext.waitForTimeout(300);
   azure = 0;
   const idPacote = await cel.evaluate(async () => {
     const p = await import("./js/ponte.js");
